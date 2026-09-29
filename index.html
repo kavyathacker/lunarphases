@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Lunar Orbit & Phase Lab</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="top-bar">
+    <h1 class="logo">Lunar Orbit Lab</h1>
+    <p class="subtitle">Earth-Moon Dynamics & Phase Simulation</p>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <div id="info-panel">
+    <div class="panel-header">View from Earth</div>
+    
+    <div id="telescope-wrapper">
+      <canvas id="telescope-canvas"></canvas>
+      <div class="reticle"></div>
+    </div>
+
+    <div class="phase-card">
+      <div id="phase-title">New Moon</div>
+      <div id="phase-illumination">Illumination: 0%</div>
+      <div id="phase-description">The unlit side faces Earth, making the Moon invisible in the night sky.</div>
+    </div>
+
+    <div class="quick-jump">
+      <label>Jump to Phase:</label>
+      <div class="btn-grid">
+        <button class="phase-btn">New</button>
+        <button class="phase-btn">Wax. Crescent</button>
+        <button class="phase-btn">1st Qtr</button>
+        <button class="phase-btn">Wax. Gibbous</button>
+        <button class="phase-btn">Full</button>
+        <button class="phase-btn">Wan. Gibbous</button>
+        <button class="phase-btn">3rd Qtr</button>
+        <button class="phase-btn">Wan. Crescent</button>
+      </div>
+    </div>
+
+    <div class="calendar-jump">
+      <label>Exact Phase by Date (IST):</label>
+      <input type="date" id="calendar-picker">
+    </div>
+  </div>
+
+  <div id="control-bar">
+    <button id="play-pause-btn" class="ctrl-btn">Pause</button>
+    
+    <div class="slider-group">
+      <label for="speed-slider">Speed:</label>
+      <input type="range" id="speed-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+    </div>
+
+    <div class="slider-group">
+      <label for="phase-slider">Orbit:</label>
+      <input type="range" id="phase-slider" min="0" max="6.283" step="0.01" value="0">
+    </div>
+
+    <button id="reset-cam-btn" class="ctrl-btn secondary">Reset</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

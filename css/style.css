@@ -1,0 +1,369 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #030508;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #f1f5f9;
+}
+
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+#top-bar {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.logo {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #38bdf8;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+}
+
+.subtitle {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* =========================================================
+   1. STANDARD PC LAYOUT (275px)
+   ========================================================= */
+#info-panel {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 275px; 
+  max-height: calc(100vh - 80px);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 14px; 
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px; 
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+}
+
+.panel-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #cbd5e1;
+}
+
+#telescope-wrapper {
+  position: relative;
+  width: 100%;
+  height: 140px; 
+  background: #000;
+  border-radius: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#telescope-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 90px; 
+  height: 90px;
+  transform: translate(-50%, -50%);
+  border: 1px dashed rgba(56, 189, 248, 0.25);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.phase-card {
+  background: rgba(2, 6, 23, 0.5);
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#phase-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+#phase-illumination {
+  font-size: 0.75rem;
+  color: #38bdf8;
+  margin-bottom: 3px;
+}
+
+#phase-description {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: #94a3b8;
+}
+
+.quick-jump label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.btn-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.phase-btn {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  padding: 6px 3px;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.phase-btn:hover {
+  background: #0284c7;
+  color: #fff;
+  border-color: #38bdf8;
+}
+
+.calendar-jump {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.calendar-jump label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#calendar-picker {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+#control-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  padding: 10px 20px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 10;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  width: max-content;
+  max-width: 95%;
+}
+
+.ctrl-btn {
+  background: #0284c7;
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+
+.ctrl-btn:hover {
+  background: #0369a1;
+}
+
+.ctrl-btn.secondary {
+  background: rgba(51, 65, 85, 0.8);
+}
+
+.ctrl-btn.secondary:hover {
+  background: #475569;
+}
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+input[type="range"] {
+  accent-color: #38bdf8;
+  cursor: pointer;
+  width: 140px; 
+  height: 16px; 
+}
+
+/* =========================================================
+   2. REGULAR MOBILE BROWSER (Scroll-Free Bottom Panel)
+   ========================================================= */
+@media (max-width: 768px) {
+  #top-bar {
+    top: 10px; left: 10px;
+  }
+  
+  #info-panel {
+    top: auto; 
+    bottom: 50px; 
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: max-content; 
+    overflow: hidden; 
+    border-radius: 20px 20px 0 0;
+    padding: 10px 12px;
+    
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 6px 12px;
+    align-content: start;
+    border-bottom: none;
+  }
+  
+  .panel-header { grid-column: span 2; margin-bottom: -4px; font-size: 0.6rem; }
+  
+  #telescope-wrapper { height: 80px; border-radius: 6px; }
+  .reticle { width: 40px; height: 40px; }
+  
+  .phase-card { padding: 4px 6px; display: flex; flex-direction: column; justify-content: center; }
+  #phase-title { font-size: 0.85rem; }
+  #phase-illumination { font-size: 0.65rem; margin-bottom: 2px; }
+  #phase-description { font-size: 0.6rem; line-height: 1.15; }
+  
+  .quick-jump { grid-column: span 2; }
+  .quick-jump label { display: none; }
+  
+  .btn-grid { 
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 4px; 
+    margin-top: 0;
+  }
+  .phase-btn { padding: 8px 0; font-size: 0.6rem; border-radius: 4px; text-align: center; white-space: nowrap; }
+  
+  .calendar-jump { 
+    grid-column: span 2; 
+    padding-top: 4px; 
+    flex-direction: row; 
+    align-items: center; 
+    justify-content: space-between; 
+    border-top: none; 
+  }
+  .calendar-jump label { font-size: 0.65rem; }
+  #calendar-picker { padding: 6px; font-size: 0.75rem; width: 60%; }
+
+  #control-bar {
+    bottom: 0; left: 0;
+    width: 100%; max-width: 100%;
+    height: 50px;
+    transform: none;
+    border-radius: 0;
+    padding: 0 8px;
+    justify-content: space-around;
+  }
+  .ctrl-btn { padding: 6px 10px; font-size: 0.7rem; }
+  .slider-group { font-size: 0.7rem; gap: 4px; }
+  input[type="range"] { width: 55px; height: 18px; }
+}
+
+/* =========================================================
+   3. DESKTOP SITE MODE ON MOBILE (Shrunk back down to ~0.75x)
+   ========================================================= */
+@media (pointer: coarse) and (min-width: 769px) {
+  #info-panel {
+    width: 310px; /* Reduced to ~0.75x of the oversized 415px */
+    padding: 18px;
+    gap: 12px;
+    border-radius: 14px;
+  }
+  .panel-header { font-size: 1rem; }
+  
+  #telescope-wrapper { height: 160px; border-radius: 10px; }
+  .reticle { width: 110px; height: 110px; }
+  
+  .phase-card { padding: 14px; border-radius: 8px; }
+  #phase-title { font-size: 1.5rem; }
+  #phase-illumination { font-size: 1.1rem; margin-bottom: 5px; }
+  #phase-description { font-size: 1rem; line-height: 1.3; }
+  
+  .quick-jump label, .calendar-jump label { font-size: 1rem; margin-bottom: 4px; }
+  .btn-grid { gap: 8px; margin-top: 4px; }
+  .phase-btn { padding: 12px 6px; font-size: 1.1rem; border-radius: 8px; }
+  
+  .calendar-jump { padding-top: 16px; margin-top: 6px; }
+  #calendar-picker { padding: 12px; font-size: 1.2rem; border-radius: 8px; }
+
+  #control-bar {
+    bottom: 20px; padding: 16px 24px; gap: 16px; border-radius: 40px;
+  }
+  
+  .ctrl-btn { 
+    padding: 14px 24px; 
+    font-size: 1.3rem; 
+    border-radius: 25px; 
+  }
+  
+  .slider-group { font-size: 1.2rem; gap: 10px; }
+  
+  /* Sliders shrunk from 240px to 170px so the Reset button fits on screen */
+  input[type="range"] { 
+    width: 170px; 
+    height: 30px; 
+  }
+  
+  .logo { font-size: 1.8rem; }
+  .subtitle { font-size: 1.1rem; margin-top: 4px; }
+}
