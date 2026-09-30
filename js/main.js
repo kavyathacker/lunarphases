@@ -117,54 +117,62 @@ sun.position.copy(sunPosition);
 sun.layers.set(SUN_LAYER); 
 scene.add(sun);
 
-// --- 2. THE EARTH (NO CHANGES, EXACTLY AS PERFECTED) ---
+// --- 2. THE EARTH (PERFECTED SINGLE-SPHERE SHADER) ---
 const earthRadius = 5.2;
 
-const earthDayMat = new THREE.MeshStandardMaterial({ map: earthDayTex, roughness: 0.8 });
-const earth = new THREE.Mesh(new THREE.SphereGeometry(earthRadius, 64, 64), earthDayMat);
-earth.receiveShadow = true; 
-scene.add(earth);
-
-const earthNightMat = new THREE.ShaderMaterial({
-  uniforms: { nightTexture: { value: earthNightTex }, sunWorldPosition: { value: sunPosition } },
-  vertexShader: ` varying vec2 vUv; varying vec3 vWorldNormal; void main() { vUv = uv; vWorldNormal = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); } `,
-  fragmentShader: ` uniform sampler2D nightTexture; uniform vec3 sunWorldPosition; varying vec2 vUv; varying vec3 vWorldNormal; void main() { vec3 toSun = normalize(sunWorldPosition); float sunDot = dot(vWorldNormal, toSun); float blend = smoothstep(0.1, -0.1, sunDot); vec4 nightColor = texture2D(nightTexture, vUv); gl_FragColor = vec4(nightColor.rgb, nightColor.a * blend); } `,
-  blending: THREE.NormalBlending, transparent: true, depthWrite: false
+// CRITICAL FIX: The multi-sphere hack is completely dead. The Earth is now EXACTLY ONE physical sphere. 
+// It natively catches standard shadows, and seamlessly illuminates the night side using a custom PBR Emissive Mask!
+// Z-fighting and texture tearing are permanently eliminated.
+const earthMat = new THREE.MeshStandardMaterial({
+  map: earthDayTex,
+  emissiveMap: earthNightTex,
+  emissive: 0xffffff,
+  emissiveIntensity: 1.0,
+  roughness: 0.8
 });
-const earthNight = new THREE.Mesh(new THREE.SphereGeometry(earthRadius + 0.015, 64, 64), earthNightMat);
-scene.add(earthNight);
 
-const shadowMat = new THREE.ShadowMaterial({ opacity: 0.85, transparent: true, depthWrite: false });
-shadowMat.onBeforeCompile = function ( shader ) {
+earthMat.onBeforeCompile = function (shader) {
   shader.uniforms.sunPos = { value: sunPosition };
+
   shader.vertexShader = `
-    varying vec3 vWorldPos;
+    varying vec3 vEarthWorldNormal;
     ${shader.vertexShader}
   `.replace(
-    '#include <project_vertex>',
+    '#include <worldpos_vertex>',
     `
-    #include <project_vertex>
-    vWorldPos = (modelMatrix * vec4( position, 1.0 )).xyz;
+    #include <worldpos_vertex>
+    vEarthWorldNormal = normalize(mat3(modelMatrix) * normal);
     `
   );
+
   shader.fragmentShader = `
     uniform vec3 sunPos;
-    varying vec3 vWorldPos;
+    varying vec3 vEarthWorldNormal;
     ${shader.fragmentShader}
   `.replace(
-    'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
+    '#include <emissivemap_fragment>',
     `
-    vec3 toSun = normalize(sunPos - vWorldPos);
-    vec3 sphereNormal = normalize(vWorldPos); 
-    float sunDot = dot(sphereNormal, toSun);
-    float daySide = smoothstep(0.0, 0.15, sunDot); 
-    gl_FragColor = vec4( color, opacity * daySide * ( 1.0 - getShadowMask() ) );
+    #ifdef USE_EMISSIVEMAP
+      vec4 emissiveColor = texture2D( emissiveMap, vUv );
+      emissiveColor.rgb = emissiveMapTexelToLinear( emissiveColor ).rgb;
+      
+      // Calculate where the sun is hitting
+      vec3 sunDir = normalize(sunPos);
+      float sunDot = dot(vEarthWorldNormal, sunDir);
+      
+      // Smoothly fade in the city lights exactly as the sun dot drops below the horizon
+      float nightBlend = smoothstep(0.15, -0.15, sunDot);
+
+      // Mask the emissive map so city lights ONLY show up on the dark side of the globe
+      totalEmissiveRadiance *= (emissiveColor.rgb * nightBlend);
+    #endif
     `
   );
 };
-const earthShadowCatcher = new THREE.Mesh(new THREE.SphereGeometry(earthRadius + 0.005, 64, 64), shadowMat);
-earthShadowCatcher.receiveShadow = true;
-earth.add(earthShadowCatcher);
+
+const earth = new THREE.Mesh(new THREE.SphereGeometry(earthRadius, 64, 64), earthMat);
+earth.receiveShadow = true; 
+scene.add(earth);
 
 // --- 3. ORBIT HIERARCHY ---
 const orbitPivot = new THREE.Group();
@@ -275,14 +283,13 @@ function updatePhaseInfo() {
   }
 }
 
-// FIXED: Adjusts offset strictly for the right panel
 function updateCameraOffset() {
   const isBottomPanel = window.innerWidth <= 768;
   if (isBottomPanel) { 
     camera.setViewOffset(window.innerWidth, window.innerHeight, 0, window.innerHeight * 0.10, window.innerWidth, window.innerHeight); 
   } else { 
-    // Shifted from 135px to 160px to perfectly balance the slightly wider Desktop Site Box!
-    camera.setViewOffset(window.innerWidth, window.innerHeight, 160, 0, window.innerWidth, window.innerHeight); 
+    // Shift reduced to 145px to perfectly balance the newly refined Desktop Site Box width
+    camera.setViewOffset(window.innerWidth, window.innerHeight, 145, 0, window.innerWidth, window.innerHeight); 
   }
   camera.updateProjectionMatrix();
 }
@@ -338,6 +345,7 @@ function animate() {
   let physicalDist = Math.abs(sweep);
   earth.castShadow = (eclipseMode === 'lunar');
 
+  // --- PERFECTED PHYSICAL LIGHTING ---
   if (eclipseMode === 'solar') {
     let blackout = Math.max(0, 1.0 - (physicalDist / 0.05)); 
     ambientLight.intensity = 0.2 - (blackout * 0.18); 
