@@ -9,7 +9,6 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputEncoding = THREE.sRGBEncoding; 
-// Enable shadow engine for deep black cast shadows
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 container.appendChild(renderer.domElement);
@@ -29,19 +28,22 @@ telescopeRenderer.outputEncoding = THREE.sRGBEncoding;
 
 const telescopeCamera = new THREE.PerspectiveCamera(24, telescopeCanvas.clientWidth / telescopeCanvas.clientHeight, 1.0, 500);
 
-// --- LAYERS ---
+// --- STRICT CAMERA LAYERS ---
 const SUN_LAYER = 1;
-const SHADOW_CONES_LAYER = 2; // Isolate cones so they hide from the telescope
+const SHADOW_CONES_LAYER = 2; 
 
-// --- LIGHTING (REAL PHYSICAL SHADOWS) ---
+telescopeCamera.layers.set(0); 
+camera.layers.enable(SUN_LAYER);
+camera.layers.enable(SHADOW_CONES_LAYER); 
+
+// --- LIGHTING ---
 const sunPosition = new THREE.Vector3(180, 0, 0);
 
 const sunLight = new THREE.PointLight(0xffffff, 1.0, 1800);
 sunLight.position.copy(sunPosition);
 scene.add(sunLight);
 
-// Directional Light precisely configured to cast real physical shadows across the void
-const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.25);
 dirLight.position.copy(sunPosition);
 dirLight.castShadow = true;
 dirLight.shadow.camera.left = -30;
@@ -58,9 +60,9 @@ scene.add(dirLight);
 const ambientLight = new THREE.AmbientLight(0x111111, 0.2);
 scene.add(ambientLight);
 
-// The exact red hue spotlight that creates the Blood Moon effect ONLY on the Earth-facing side!
-const bloodLight = new THREE.SpotLight(0xff3300, 0, 50, 0.3, 1.0);
+const bloodLight = new THREE.SpotLight(0xff2200, 0, 50, 0.4, 1.0);
 bloodLight.position.set(0, 0, 0); 
+bloodLight.castShadow = false; 
 scene.add(bloodLight);
 scene.add(bloodLight.target);
 
@@ -94,12 +96,9 @@ const sunTex = safeLoad('assets/8k_sun.jpg', '#f59e0b');
 const starsGeo = new THREE.BufferGeometry();
 const starCount = 2200;
 const starPos = new Float32Array(starCount * 3);
-
 for (let i = 0; i < starCount * 3; i += 3) {
-  const u = Math.random();
-  const v = Math.random();
-  const theta = u * 2.0 * Math.PI;
-  const phi = Math.acos(2.0 * v - 1.0);
+  const u = Math.random(); const v = Math.random();
+  const theta = u * 2.0 * Math.PI; const phi = Math.acos(2.0 * v - 1.0);
   const r = 600 + (Math.random() * 200); 
   starPos[i] = r * Math.sin(phi) * Math.cos(theta);
   starPos[i+1] = r * Math.sin(phi) * Math.sin(theta);
@@ -117,58 +116,54 @@ sun.position.copy(sunPosition);
 sun.layers.set(SUN_LAYER); 
 scene.add(sun);
 
-camera.layers.enable(SUN_LAYER);
-camera.layers.enable(SHADOW_CONES_LAYER); // Main camera sees the cones
-
-telescopeCamera.layers.disable(SUN_LAYER);
-telescopeCamera.layers.disable(SHADOW_CONES_LAYER); // Telescope completely ignores the cones
-
 // --- 2. THE EARTH ---
 const earthRadius = 5.2;
-const earthGeo = new THREE.SphereGeometry(earthRadius, 64, 64);
-const earthMat = new THREE.ShaderMaterial({
-  uniforms: {
-    dayTexture: { value: earthDayTex },
-    nightTexture: { value: earthNightTex },
-    sunWorldPosition: { value: sunPosition }
-  },
-  vertexShader: `
-    varying vec2 vUv;
-    varying vec3 vWorldNormal;
-    varying vec3 vWorldPosition;
-    void main() {
-      vUv = uv;
-      vWorldNormal = normalize(mat3(modelMatrix) * normal);
-      vec4 worldPos = modelMatrix * vec4(position, 1.0);
-      vWorldPosition = worldPos.xyz;
-      gl_Position = projectionMatrix * viewMatrix * worldPos;
-    }
-  `,
-  fragmentShader: `
-    uniform sampler2D dayTexture;
-    uniform sampler2D nightTexture;
-    uniform vec3 sunWorldPosition;
-    varying vec2 vUv;
-    varying vec3 vWorldNormal;
-    varying vec3 vWorldPosition;
-    void main() {
-      vec3 toSun = normalize(sunWorldPosition - vWorldPosition);
-      float sunDot = dot(vWorldNormal, toSun);
-      float blend = smoothstep(-0.1, 0.1, sunDot);
-      vec4 day = texture2D(dayTexture, vUv);
-      vec4 night = texture2D(nightTexture, vUv);
-      gl_FragColor = mix(night, day, blend);
-    }
-  `
-});
-const earth = new THREE.Mesh(earthGeo, earthMat);
-earth.castShadow = true; 
+
+const earthDayMat = new THREE.MeshStandardMaterial({ map: earthDayTex, roughness: 0.8 });
+const earth = new THREE.Mesh(new THREE.SphereGeometry(earthRadius, 64, 64), earthDayMat);
+earth.receiveShadow = true; 
 scene.add(earth);
 
-const shadowMat = new THREE.ShadowMaterial({ opacity: 0.85 });
-const earthShadowCatcher = new THREE.Mesh(new THREE.SphereGeometry(earthRadius + 0.05, 64, 64), shadowMat);
+const earthNightMat = new THREE.ShaderMaterial({
+  uniforms: { nightTexture: { value: earthNightTex }, sunWorldPosition: { value: sunPosition } },
+  vertexShader: ` varying vec2 vUv; varying vec3 vWorldNormal; void main() { vUv = uv; vWorldNormal = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); } `,
+  fragmentShader: ` uniform sampler2D nightTexture; uniform vec3 sunWorldPosition; varying vec2 vUv; varying vec3 vWorldNormal; void main() { vec3 toSun = normalize(sunWorldPosition); float sunDot = dot(vWorldNormal, toSun); float blend = smoothstep(0.1, -0.1, sunDot); vec4 nightColor = texture2D(nightTexture, vUv); gl_FragColor = vec4(nightColor.rgb, nightColor.a * blend); } `,
+  blending: THREE.NormalBlending, transparent: true, depthWrite: false
+});
+const earthNight = new THREE.Mesh(new THREE.SphereGeometry(earthRadius + 0.015, 64, 64), earthNightMat);
+scene.add(earthNight);
+
+const shadowMat = new THREE.ShadowMaterial({ opacity: 0.85, transparent: true, depthWrite: false });
+shadowMat.onBeforeCompile = function ( shader ) {
+  shader.uniforms.sunPos = { value: sunPosition };
+  shader.vertexShader = `
+    varying vec3 vWorldPos;
+    ${shader.vertexShader}
+  `.replace(
+    '#include <project_vertex>',
+    `
+    #include <project_vertex>
+    vWorldPos = (modelMatrix * vec4( position, 1.0 )).xyz;
+    `
+  );
+  shader.fragmentShader = `
+    uniform vec3 sunPos;
+    varying vec3 vWorldPos;
+    ${shader.fragmentShader}
+  `.replace(
+    'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
+    `
+    vec3 toSun = normalize(sunPos - vWorldPos);
+    vec3 sphereNormal = normalize(vWorldPos); 
+    float sunDot = dot(sphereNormal, toSun);
+    float daySide = smoothstep(0.0, 0.15, sunDot); 
+    gl_FragColor = vec4( color, opacity * daySide * ( 1.0 - getShadowMask() ) );
+    `
+  );
+};
+const earthShadowCatcher = new THREE.Mesh(new THREE.SphereGeometry(earthRadius + 0.005, 64, 64), shadowMat);
 earthShadowCatcher.receiveShadow = true;
-scene.add(earthShadowCatcher);
+earth.add(earthShadowCatcher);
 
 // --- 3. ORBIT HIERARCHY ---
 const orbitPivot = new THREE.Group();
@@ -182,11 +177,12 @@ const moonRadius = 1.70;
 const moonGeo = new THREE.SphereGeometry(moonRadius, 64, 64);
 moonGeo.rotateY(-Math.PI / 2);
 
-// Uses pure texture now—lighting is handled 100% by physics!
 const moonMat = new THREE.MeshStandardMaterial({
   map: moonTex,
   roughness: 1.0,
-  metalness: 0.0
+  metalness: 0.0,
+  emissive: 0x000000, 
+  emissiveIntensity: 0
 });
 const moon = new THREE.Mesh(moonGeo, moonMat);
 moon.castShadow = true;
@@ -209,31 +205,22 @@ scene.add(shadowsGroup);
 
 function createCone(radiusTop, radiusBottom, height, colorHex, opacity) {
   const geo = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 32, 1, true);
-  geo.translate(0, height / 2, 0); 
-  geo.rotateZ(Math.PI / 2); 
-  const mat = new THREE.MeshBasicMaterial({
-    color: colorHex,
-    transparent: true,
-    opacity: opacity,
-    side: THREE.DoubleSide,
-    depthWrite: false
-  });
+  geo.translate(0, height / 2, 0); geo.rotateZ(Math.PI / 2); 
+  const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: opacity, side: THREE.DoubleSide, depthWrite: false });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.layers.set(SHADOW_CONES_LAYER); // Confines cones strictly to main camera
+  
+  mesh.layers.disable(0); 
+  mesh.layers.enable(SHADOW_CONES_LAYER); 
   return mesh;
 }
 
-// Earth Shadows (Dull, highly translucent yellow)
-const earthUmbra = createCone(0, earthRadius, 86.6, 0x888822, 0.1); 
-const earthPenumbra = createCone(15.4, earthRadius, 86.6, 0x888822, 0.03); 
-shadowsGroup.add(earthUmbra);
-shadowsGroup.add(earthPenumbra);
+const earthUmbra = createCone(0, earthRadius, 86.6, 0x444400, 0.08); 
+const earthPenumbra = createCone(15.4, earthRadius, 86.6, 0x444400, 0.02); 
+shadowsGroup.add(earthUmbra); shadowsGroup.add(earthPenumbra);
 
-// Moon Shadows (Dull, translucent whitish-grey)
-const moonUmbra = createCone(0, moonRadius, 19.0, 0x999999, 0.15); 
-const moonPenumbra = createCone(4.0, moonRadius, 19.0, 0x999999, 0.05); 
-shadowsGroup.add(moonUmbra);
-shadowsGroup.add(moonPenumbra);
+const moonUmbra = createCone(0, moonRadius, 19.0, 0x888888, 0.10); 
+const moonPenumbra = createCone(4.0, moonRadius, 19.0, 0x888888, 0.04); 
+shadowsGroup.add(moonUmbra); shadowsGroup.add(moonPenumbra);
 
 // --- SIMULATION DYNAMICS ---
 let isPlaying = true;
@@ -241,7 +228,8 @@ let orbitSpeed = 1.0;
 let orbitalAnomaly = 0; 
 let activeCameraMode = 'free'; 
 let eclipseMode = 'none'; 
-const MAX_ORBIT_TILT = 20 * Math.PI / 180;
+
+const MAX_ORBIT_TILT = 5.14 * Math.PI / 180;
 
 const phases = [
   { name: "New Moon", min: 6.13, max: 0.15, illumRange: "0%", desc: "The unlit side faces Earth, making the Moon invisible in the night sky." },
@@ -255,10 +243,14 @@ const phases = [
 ];
 
 const moonWorldPos = new THREE.Vector3();
+let targetCamPos = new THREE.Vector3();
+let targetCtrlPos = new THREE.Vector3();
+
+let lastPhaseName = "";
+let lastIllumText = "";
 
 function updatePhaseInfo() {
   moon.getWorldPosition(moonWorldPos);
-  
   let phaseAngle = Math.atan2(-moonWorldPos.z, moonWorldPos.x);
   if (phaseAngle < 0) phaseAngle += Math.PI * 2;
   const exactIllum = Math.round(((1 - Math.cos(phaseAngle)) / 2) * 100);
@@ -267,17 +259,45 @@ function updatePhaseInfo() {
   if (phaseAngle >= 6.13 || phaseAngle <= 0.15) { activePhase = phases[0]; } 
   else { for (let p of phases) { if (phaseAngle >= p.min && phaseAngle < p.max) { activePhase = p; break; } } }
   
-  document.getElementById('phase-title').innerText = activePhase.name;
-  if (isPlaying) { document.getElementById('phase-illumination').innerText = `Illumination: ${exactIllum}%`; } 
-  else { document.getElementById('phase-illumination').innerText = `Illumination: ${activePhase.illumRange}`; }
-  document.getElementById('phase-description').innerText = activePhase.desc;
+  const newTitle = activePhase.name;
+  const newIllum = isPlaying ? `Illumination: ${exactIllum}%` : `Illumination: ${activePhase.illumRange}`;
+  
+  if (lastPhaseName !== newTitle) {
+    document.getElementById('phase-title').innerText = newTitle;
+    document.getElementById('phase-description').innerText = activePhase.desc;
+    lastPhaseName = newTitle;
+  }
+  
+  if (lastIllumText !== newIllum) {
+    document.getElementById('phase-illumination').innerText = newIllum;
+    lastIllumText = newIllum;
+  }
 }
 
 function updateCameraOffset() {
-  if (window.innerWidth <= 768) {
-    camera.setViewOffset(window.innerWidth, window.innerHeight, 0, window.innerHeight * 0.14, window.innerWidth, window.innerHeight);
-  } else { camera.clearViewOffset(); }
+  const isBottomPanel = (window.innerWidth <= 1024 && window.innerHeight >= 600) || (window.innerWidth <= 768);
+  if (isBottomPanel) { 
+    camera.setViewOffset(window.innerWidth, window.innerHeight, 0, window.innerHeight * 0.10, window.innerWidth, window.innerHeight); 
+  } else { 
+    camera.setViewOffset(window.innerWidth, window.innerHeight, 135, 0, window.innerWidth, window.innerHeight); 
+  }
   camera.updateProjectionMatrix();
+}
+
+function resizeTelescope() {
+  const wrapper = document.getElementById('telescope-wrapper');
+  const tWidth = wrapper.clientWidth;
+  const tHeight = wrapper.clientHeight;
+  
+  const pixelRatio = window.devicePixelRatio || 1;
+  const expectedWidth = Math.floor(tWidth * pixelRatio);
+  const expectedHeight = Math.floor(tHeight * pixelRatio);
+
+  if (telescopeCanvas.width !== expectedWidth || telescopeCanvas.height !== expectedHeight) {
+    telescopeRenderer.setSize(tWidth, tHeight, false);
+    telescopeCamera.aspect = tWidth / tHeight;
+    telescopeCamera.updateProjectionMatrix();
+  }
 }
 
 // --- ANIMATION LOOP ---
@@ -295,26 +315,36 @@ function animate() {
     orbitPivot.rotation.y += delta * 0.05 * orbitSpeed;
   }
 
+  if (eclipseMode === 'solar' || eclipseMode === 'lunar') {
+    moonOrbitPlane.rotation.z = 0; moonOrbitPlane.rotation.x = MAX_ORBIT_TILT; 
+  } else {
+    moonOrbitPlane.rotation.z = MAX_ORBIT_TILT; moonOrbitPlane.rotation.x = 0; 
+  }
+
+  let v = parseFloat(document.getElementById('eclipse-slider').value);
+  let sweep = (v - 0.5) * 0.7; 
+  
+  if (eclipseMode === 'solar') { orbitalAnomaly = 0 - sweep; } 
+  else if (eclipseMode === 'lunar') { orbitalAnomaly = Math.PI + sweep; }
+
   moon.position.x = 20 * Math.cos(orbitalAnomaly);
   moon.position.z = -20 * Math.sin(orbitalAnomaly);
   moon.lookAt(earth.position);
   moon.getWorldPosition(moonWorldPos);
 
-  let v = parseFloat(document.getElementById('eclipse-slider').value);
-  if (eclipseMode === 'solar' || eclipseMode === 'lunar') {
-    moonOrbitPlane.rotation.z = (1 - v) * MAX_ORBIT_TILT; 
-  } else {
-    moonOrbitPlane.rotation.z = MAX_ORBIT_TILT; 
-    v = 0; 
-  }
+  let physicalDist = Math.abs(sweep);
 
-  // --- PHYSICAL LIGHTING LOGIC ---
+  earth.castShadow = (eclipseMode === 'lunar');
+
+  // --- PERFECTED PHYSICAL LIGHTING ---
   if (eclipseMode === 'solar') {
-    ambientLight.intensity = 0.2 - (v * 0.18); // Drops ambient to near 0, making the front pitch black!
+    let blackout = Math.max(0, 1.0 - (physicalDist / 0.05)); 
+    ambientLight.intensity = 0.2 - (blackout * 0.18); 
     bloodLight.intensity = 0;
   } else if (eclipseMode === 'lunar') {
-    ambientLight.intensity = 0.2;
-    bloodLight.intensity = v * 5.0; // Shines red purely on the Earth-facing side!
+    ambientLight.intensity = 0.2; 
+    let redIntensity = Math.max(0, 1.0 - (physicalDist / 0.28)) * 3.0; 
+    bloodLight.intensity = redIntensity; 
     bloodLight.target.position.copy(moonWorldPos);
   } else {
     ambientLight.intensity = 0.2;
@@ -327,28 +357,40 @@ function animate() {
   }
 
   if (activeCameraMode === 'earth') {
-    camera.position.lerp(new THREE.Vector3(0, 0, 0), 0.08);
-    controls.target.lerp(moonWorldPos, 0.08);
+    let dirToMoon = moonWorldPos.clone().normalize();
+    targetCamPos.copy(dirToMoon.multiplyScalar(5.5)); 
+    targetCtrlPos.copy(moonWorldPos);
   } else if (activeCameraMode === 'moon') {
-    camera.position.lerp(moonWorldPos, 0.08);
-    controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.08);
+    let dirToEarth = moonWorldPos.clone().negate().normalize();
+    targetCamPos.copy(moonWorldPos).add(dirToEarth.multiplyScalar(1.9)); 
+    targetCtrlPos.set(0, 0, 0);
   } else if (activeCameraMode === 'reset') {
-    camera.position.lerp(new THREE.Vector3(-105, 20, 0), 0.08);
-    controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.08);
-    if (camera.position.distanceTo(new THREE.Vector3(-105, 20, 0)) < 1) { activeCameraMode = 'free'; }
+    targetCamPos.set(-105, 20, 0); targetCtrlPos.set(0, 0, 0);
+  }
+
+  if (activeCameraMode !== 'free') {
+    let camDist = camera.position.distanceTo(targetCamPos);
+    let ctrlDist = controls.target.distanceTo(targetCtrlPos);
+    
+    if (camDist < 2.0 && ctrlDist < 2.0) {
+      camera.position.copy(targetCamPos);
+      controls.target.copy(targetCtrlPos);
+      if (activeCameraMode === 'reset') {
+        activeCameraMode = 'free'; 
+      }
+    } else {
+      camera.position.lerp(targetCamPos, 0.08);
+      controls.target.lerp(targetCtrlPos, 0.08);
+    }
+    camera.lookAt(controls.target);
+  } else {
+    controls.update();
   }
 
   updatePhaseInfo();
-  controls.update();
   renderer.render(scene, camera);
 
-  const tWidth = telescopeCanvas.clientWidth;
-  const tHeight = telescopeCanvas.clientHeight;
-  if (tWidth > 0 && tHeight > 0) {
-    telescopeRenderer.setSize(tWidth, tHeight, false);
-    telescopeCamera.aspect = tWidth / tHeight;
-    telescopeCamera.updateProjectionMatrix();
-  }
+  // DELETED the resizeTelescope() call from here to kill layout thrashing and restore 60FPS!
 
   const dirToMoon = moonWorldPos.clone().sub(earth.position).normalize();
   telescopeCamera.position.copy(earth.position).add(dirToMoon.multiplyScalar(5.3));
@@ -367,22 +409,11 @@ function clearEclipseModes() {
 
 function toggleEclipse(mode) {
   if (eclipseMode === mode) {
-    // Second click: TURN OFF and resume regular orbit
-    clearEclipseModes();
-    isPlaying = true;
-    playBtn.innerText = "Pause";
+    clearEclipseModes(); isPlaying = true; playBtn.innerText = "Pause";
   } else {
-    // First click: TURN ON, freeze orbit, snap to eclipse
-    clearEclipseModes();
-    eclipseMode = mode;
-    document.getElementById(`btn-${mode}`).classList.add('active');
-    
-    orbitPivot.rotation.y = 0; 
-    orbitalAnomaly = (mode === 'solar') ? 0 : Math.PI; 
-    isPlaying = false;
-    playBtn.innerText = "Play";
-    activeCameraMode = 'earth'; 
-    document.getElementById('eclipse-slider').value = 1;
+    clearEclipseModes(); eclipseMode = mode; document.getElementById(`btn-${mode}`).classList.add('active');
+    orbitPivot.rotation.y = 0; isPlaying = false; playBtn.innerText = "Play";
+    activeCameraMode = 'earth'; document.getElementById('eclipse-slider').value = 0.5; 
   }
   updatePhaseInfo();
 }
@@ -390,10 +421,8 @@ function toggleEclipse(mode) {
 // --- EVENT LISTENERS ---
 const playBtn = document.getElementById('play-pause-btn');
 playBtn.addEventListener('click', () => {
-  isPlaying = !isPlaying;
-  playBtn.innerText = isPlaying ? "Pause" : "Play";
-  if (isPlaying) clearEclipseModes();
-  updatePhaseInfo();
+  isPlaying = !isPlaying; playBtn.innerText = isPlaying ? "Pause" : "Play";
+  if (isPlaying) clearEclipseModes(); updatePhaseInfo();
 });
 
 document.getElementById('speed-slider').addEventListener('input', (e) => { orbitSpeed = parseFloat(e.target.value); });
@@ -401,7 +430,6 @@ document.getElementById('phase-slider').addEventListener('input', (e) => { orbit
 
 document.getElementById('btn-solar').addEventListener('click', () => toggleEclipse('solar'));
 document.getElementById('btn-lunar').addEventListener('click', () => toggleEclipse('lunar'));
-
 document.getElementById('btn-earth-surf').addEventListener('click', () => { activeCameraMode = 'earth'; });
 document.getElementById('btn-moon-surf').addEventListener('click', () => { activeCameraMode = 'moon'; });
 document.getElementById('btn-shadows').addEventListener('click', () => {
@@ -409,49 +437,44 @@ document.getElementById('btn-shadows').addEventListener('click', () => {
   document.getElementById('btn-shadows').classList.toggle('active', shadowsGroup.visible);
 });
 
-const buttonAngles = { "New": 0, "Wax. Crescent": 0.785, "1st Qtr": 1.57, "Wax. Gibbous": 2.356, "Full": 3.141, "Wan. Gibbous": 3.927, "3rd Qtr": 4.712, "Wan. Crescent": 5.498 };
+document.getElementById('btn-live-date').addEventListener('click', () => {
+  document.getElementById('calendar-picker').value = '';
+  isPlaying = true; playBtn.innerText = "Pause"; clearEclipseModes(); updatePhaseInfo();
+});
 
+const buttonAngles = { "New": 0, "Wax. Crescent": 0.785, "1st Qtr": 1.57, "Wax. Gibbous": 2.356, "Full": 3.141, "Wan. Gibbous": 3.927, "3rd Qtr": 4.712, "Wan. Crescent": 5.498 };
 document.querySelectorAll('.phase-btn').forEach(btn => {
   btn.addEventListener('click', (e) => {
     const btnText = e.target.innerText.trim();
     if (buttonAngles[btnText] !== undefined) {
-      orbitPivot.rotation.y = 0; 
-      orbitalAnomaly = buttonAngles[btnText];
-      isPlaying = false;
-      playBtn.innerText = "Play";
-      clearEclipseModes();
-      updatePhaseInfo();
+      orbitPivot.rotation.y = 0; orbitalAnomaly = buttonAngles[btnText];
+      isPlaying = false; playBtn.innerText = "Play"; clearEclipseModes(); updatePhaseInfo();
     }
   });
 });
 
 document.getElementById('calendar-picker').addEventListener('change', (e) => {
-  const selectedDate = new Date(e.target.value);
-  if (isNaN(selectedDate)) return;
+  const selectedDate = new Date(e.target.value); if (isNaN(selectedDate)) return;
   selectedDate.setUTCHours(6, 30, 0, 0); 
   const knownNewMoon = new Date(Date.UTC(2000, 0, 6, 18, 14, 0)).getTime();
   const synodicMonthMs = 29.53058770576 * 24 * 60 * 60 * 1000;
-  
   const timeDiff = selectedDate.getTime() - knownNewMoon;
   let phaseFraction = (timeDiff % synodicMonthMs) / synodicMonthMs;
   if (phaseFraction < 0) phaseFraction += 1.0; 
-  
-  orbitPivot.rotation.y = 0; 
-  orbitalAnomaly = phaseFraction * Math.PI * 2;
-  isPlaying = false; 
-  playBtn.innerText = "Play";
-  clearEclipseModes();
-  updatePhaseInfo();
+  orbitPivot.rotation.y = 0; orbitalAnomaly = phaseFraction * Math.PI * 2;
+  isPlaying = false; playBtn.innerText = "Play"; clearEclipseModes(); updatePhaseInfo();
 });
 
 document.getElementById('reset-cam-btn').addEventListener('click', () => { activeCameraMode = 'reset'; });
 controls.addEventListener('start', () => { if (activeCameraMode !== 'free' && activeCameraMode !== 'reset') activeCameraMode = 'free'; });
 
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.aspect = window.innerWidth / window.innerHeight; 
   updateCameraOffset(); 
   renderer.setSize(window.innerWidth, window.innerHeight);
+  resizeTelescope(); 
 });
 
 updateCameraOffset();
+resizeTelescope(); 
 animate();
