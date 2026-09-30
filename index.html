@@ -44,11 +44,13 @@
     </div>
 
     <div class="calendar-jump">
-      <label>Exact Phase by Date (IST):</label>
+      <div class="calendar-header">
+        <label>Exact Phase Date:</label>
+        <button class="action-btn" id="btn-live-date">Live Mode</button>
+      </div>
       <input type="date" id="calendar-picker">
     </div>
 
-    <!-- 2x2 Action Grid + Shadows -->
     <div class="action-grid">
       <button class="action-btn" id="btn-solar">Solar Ecl.</button>
       <button class="action-btn" id="btn-lunar">Lunar Ecl.</button>
@@ -58,8 +60,8 @@
     </div>
 
     <div class="eclipse-control" id="eclipse-control-box">
-      <label>Eclipse Magnitude:</label>
-      <input type="range" id="eclipse-slider" min="0" max="1" step="0.01" value="1">
+      <label>Eclipse Sweep:</label>
+      <input type="range" id="eclipse-slider" min="0" max="1" step="0.005" value="0.5">
     </div>
   </div>
 
