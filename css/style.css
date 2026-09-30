@@ -22,6 +22,7 @@ body, html {
 
 /* =========================================================
    1. STANDARD PC & SIDEBAR LAYOUT 
+   (Now strictly applies to Desktop Site mode and Quarter Snaps)
    ========================================================= */
 #info-panel {
   position: absolute; top: 14px; right: 14px; width: 275px; max-height: calc(100vh - 40px);
@@ -34,12 +35,9 @@ body, html {
 .panel-header { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #cbd5e1; }
 
 #telescope-wrapper { position: relative; width: 100%; height: 120px; background: #000; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); overflow: hidden; flex-shrink: 0; }
-/* FIXED: Absolute positioning absolutely guarantees the canvas can never stretch or push the side panel */
 #telescope-canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; display: block; }
 .reticle { position: absolute; top: 50%; left: 50%; width: 90px; height: 90px; transform: translate(-50%, -50%); border: 1px dashed rgba(56, 189, 248, 0.25); border-radius: 50%; pointer-events: none; }
 
-/* FIXED: Added a strictly locked min-height of 115px. 
-   This stops the entire side-panel from stretching and shrinking vertically when the text wraps to new lines! */
 .phase-card { background: rgba(2, 6, 23, 0.5); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); min-height: 115px; }
 #phase-title { font-size: 1.05rem; font-weight: 700; color: #f8fafc; }
 #phase-illumination { font-size: 0.75rem; color: #38bdf8; margin-bottom: 3px; }
@@ -77,19 +75,19 @@ body, html {
 input[type="range"] { accent-color: #38bdf8; cursor: pointer; width: 140px; height: 16px; }
 
 /* =========================================================
-   2. COMPACT BOTTOM PANEL (Mobile & Half-View Snaps)
+   2. COMPACT BOTTOM PANEL (Strictly True Mobile Only)
    ========================================================= */
-@media (max-width: 1024px) and (min-height: 600px), (max-width: 768px) {
+@media (max-width: 768px) {
   #top-bar { top: 6px; left: 6px; }
   .logo { font-size: 1rem; }
   .subtitle { font-size: 0.6rem; }
   
   #info-panel {
-    top: auto; bottom: 42px; left: 0; right: 0; width: 100%; height: max-content; overflow: hidden; 
-    border-radius: 16px 16px 0 0; padding: 6px 8px;
+    top: auto; bottom: 38px; left: 0; right: 0; width: 100%; height: max-content; overflow: hidden; 
+    border-radius: 16px 16px 0 0; padding: 4px; /* Tighter padding */
     display: grid; 
-    grid-template-columns: 115px 1fr; 
-    gap: 3px 8px; align-content: start; border-bottom: none;
+    grid-template-columns: 90px 1fr; /* Considerably smaller telescope grid column */
+    gap: 2px 4px; align-content: start; border-bottom: none;
   }
   
   .panel-header { display: none; } 
@@ -97,49 +95,49 @@ input[type="range"] { accent-color: #38bdf8; cursor: pointer; width: 140px; heig
   #telescope-wrapper { 
     grid-column: 1; grid-row: 1 / 6; 
     height: 100%; 
-    min-height: 115px; 
+    min-height: 90px; /* Highly compacted telescope view */
     border-radius: 8px; 
   }
-  .reticle { width: 45px; height: 45px; }
+  .reticle { width: 40px; height: 40px; }
   
   .phase-card { grid-column: 2; grid-row: 1; padding: 2px 4px; display: flex; flex-direction: column; justify-content: center; min-height: auto; }
-  #phase-title { font-size: 0.75rem; margin-bottom: 0px; }
-  #phase-illumination { font-size: 0.6rem; margin-bottom: 0px; }
+  #phase-title { font-size: 0.7rem; margin-bottom: 0px; }
+  #phase-illumination { font-size: 0.55rem; margin-bottom: 0px; }
   #phase-description { display: none; } 
   
   .quick-jump { grid-column: 2; grid-row: 2; }
   .quick-jump label { display: none; }
-  .btn-grid { grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 0; }
-  .phase-btn { padding: 5px 0; font-size: 0.5rem; border-radius: 4px; text-align: center; }
+  .btn-grid { grid-template-columns: repeat(4, 1fr); gap: 2px; margin-top: 0; }
+  .phase-btn { padding: 4px 0; font-size: 0.45rem; border-radius: 4px; text-align: center; }
   
   .calendar-jump { grid-column: 2; grid-row: 3; padding-top: 0; display: flex; flex-direction: column; gap: 2px; border-top: none; }
   .calendar-header label { display: none; } 
-  #btn-live-date { padding: 4px 6px; font-size: 0.55rem; width: 100%; }
-  #calendar-picker { padding: 4px; font-size: 0.65rem; width: 100%; }
+  #btn-live-date { padding: 3px 4px; font-size: 0.5rem; width: 100%; }
+  #calendar-picker { padding: 3px; font-size: 0.6rem; width: 100%; }
 
-  .action-grid { grid-column: 2; grid-row: 4; display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; padding-top: 2px; margin-top: 0; border: none; }
-  #btn-shadows { grid-column: span 2; padding: 4px 0; font-size: 0.6rem; }
-  .action-btn { padding: 5px 0; font-size: 0.55rem; border-radius: 4px; letter-spacing: -0.2px; }
+  .action-grid { grid-column: 2; grid-row: 4; display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; padding-top: 2px; margin-top: 0; border: none; }
+  #btn-shadows { grid-column: span 2; padding: 3px 0; font-size: 0.5rem; }
+  .action-btn { padding: 4px 0; font-size: 0.5rem; border-radius: 4px; letter-spacing: -0.2px; }
 
   .eclipse-control { grid-column: 2; grid-row: 5; flex-direction: column; align-items: flex-start; padding-top: 2px; }
-  .eclipse-control label { font-size: 0.5rem; margin-bottom: 3px; }
-  #eclipse-slider { width: 100%; height: 12px; }
+  .eclipse-control label { font-size: 0.45rem; margin-bottom: 2px; }
+  #eclipse-slider { width: 100%; height: 10px; }
 
-  #control-bar { bottom: 0; left: 0; width: 100%; max-width: 100%; height: 40px; transform: none; border-radius: 0; padding: 0 4px; justify-content: space-around; }
-  .ctrl-btn { padding: 4px 6px; font-size: 0.6rem; }
-  .slider-group { font-size: 0.6rem; gap: 4px; }
-  #speed-slider, #phase-slider { width: 50px; height: 12px; }
+  #control-bar { bottom: 0; left: 0; width: 100%; max-width: 100%; height: 36px; transform: none; border-radius: 0; padding: 0 4px; justify-content: space-around; }
+  .ctrl-btn { padding: 3px 6px; font-size: 0.55rem; }
+  .slider-group { font-size: 0.55rem; gap: 4px; }
+  #speed-slider, #phase-slider { width: 50px; height: 10px; }
 }
 
 /* =========================================================
-   3. DESKTOP SITE MODE ON MOBILE (~0.75x Scale)
+   3. LARGE TOUCH SCREEN SCALING 
    ========================================================= */
 @media (pointer: coarse) and (min-width: 1025px) {
   #info-panel { width: 310px; padding: 18px; gap: 12px; border-radius: 14px; }
   .panel-header { font-size: 1rem; }
   #telescope-wrapper { height: 160px; border-radius: 10px; }
   .reticle { width: 110px; height: 110px; }
-  .phase-card { padding: 14px; border-radius: 8px; min-height: 155px; } /* Proportional locked height */
+  .phase-card { padding: 14px; border-radius: 8px; min-height: 155px; } 
   #phase-title { font-size: 1.5rem; }
   #phase-illumination { font-size: 1.1rem; margin-bottom: 5px; }
   #phase-description { font-size: 1rem; line-height: 1.3; }
