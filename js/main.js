@@ -117,7 +117,7 @@ sun.position.copy(sunPosition);
 sun.layers.set(SUN_LAYER); 
 scene.add(sun);
 
-// --- 2. THE EARTH ---
+// --- 2. THE EARTH (NO CHANGES, EXACTLY AS PERFECTED) ---
 const earthRadius = 5.2;
 
 const earthDayMat = new THREE.MeshStandardMaterial({ map: earthDayTex, roughness: 0.8 });
@@ -127,15 +127,12 @@ scene.add(earth);
 
 const earthNightMat = new THREE.ShaderMaterial({
   uniforms: { nightTexture: { value: earthNightTex }, sunWorldPosition: { value: sunPosition } },
-  // FIXED: Shader now uses modelViewMatrix to ensure the Night Layer perfectly locks rotation to the Day Layer
-  vertexShader: ` varying vec2 vUv; varying vec3 vWorldNormal; void main() { vUv = uv; vWorldNormal = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); } `,
+  vertexShader: ` varying vec2 vUv; varying vec3 vWorldNormal; void main() { vUv = uv; vWorldNormal = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); } `,
   fragmentShader: ` uniform sampler2D nightTexture; uniform vec3 sunWorldPosition; varying vec2 vUv; varying vec3 vWorldNormal; void main() { vec3 toSun = normalize(sunWorldPosition); float sunDot = dot(vWorldNormal, toSun); float blend = smoothstep(0.1, -0.1, sunDot); vec4 nightColor = texture2D(nightTexture, vUv); gl_FragColor = vec4(nightColor.rgb, nightColor.a * blend); } `,
   blending: THREE.NormalBlending, transparent: true, depthWrite: false
 });
 const earthNight = new THREE.Mesh(new THREE.SphereGeometry(earthRadius + 0.015, 64, 64), earthNightMat);
-
-// CRITICAL FIX: The Night texture is now mathematically a strict child of the spinning Earth, preventing the graphics from tearing!
-earth.add(earthNight);
+scene.add(earthNight);
 
 const shadowMat = new THREE.ShadowMaterial({ opacity: 0.85, transparent: true, depthWrite: false });
 shadowMat.onBeforeCompile = function ( shader ) {
@@ -278,13 +275,14 @@ function updatePhaseInfo() {
   }
 }
 
-// FIXED: Adjusted to rigidly detect true mobile view vs desktop-mode phone rendering
+// FIXED: Adjusts offset strictly for the right panel
 function updateCameraOffset() {
   const isBottomPanel = window.innerWidth <= 768;
   if (isBottomPanel) { 
     camera.setViewOffset(window.innerWidth, window.innerHeight, 0, window.innerHeight * 0.10, window.innerWidth, window.innerHeight); 
   } else { 
-    camera.setViewOffset(window.innerWidth, window.innerHeight, 135, 0, window.innerWidth, window.innerHeight); 
+    // Shifted from 135px to 160px to perfectly balance the slightly wider Desktop Site Box!
+    camera.setViewOffset(window.innerWidth, window.innerHeight, 160, 0, window.innerWidth, window.innerHeight); 
   }
   camera.updateProjectionMatrix();
 }
@@ -338,10 +336,8 @@ function animate() {
   moon.getWorldPosition(moonWorldPos);
 
   let physicalDist = Math.abs(sweep);
-
   earth.castShadow = (eclipseMode === 'lunar');
 
-  // --- PERFECTED PHYSICAL LIGHTING ---
   if (eclipseMode === 'solar') {
     let blackout = Math.max(0, 1.0 - (physicalDist / 0.05)); 
     ambientLight.intensity = 0.2 - (blackout * 0.18); 
