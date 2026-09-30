@@ -47,6 +47,20 @@
       <label>Exact Phase by Date (IST):</label>
       <input type="date" id="calendar-picker">
     </div>
+
+    <!-- 2x2 Action Grid + Shadows -->
+    <div class="action-grid">
+      <button class="action-btn" id="btn-solar">Solar Ecl.</button>
+      <button class="action-btn" id="btn-lunar">Lunar Ecl.</button>
+      <button class="action-btn" id="btn-earth-surf">Earth Sfc</button>
+      <button class="action-btn" id="btn-moon-surf">Moon Sfc</button>
+      <button class="action-btn" id="btn-shadows">Toggle Shadows</button>
+    </div>
+
+    <div class="eclipse-control" id="eclipse-control-box">
+      <label>Eclipse Magnitude:</label>
+      <input type="range" id="eclipse-slider" min="0" max="1" step="0.01" value="1">
+    </div>
   </div>
 
   <div id="control-bar">
