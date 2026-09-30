@@ -3,7 +3,9 @@ const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(-105, 20, 0);
+// FIXED: Establishes a comfortable, less-zoomed baseline distance dynamically!
+const startZ = window.innerWidth <= 768 ? -150 : -120;
+camera.position.set(startZ, 25, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -274,8 +276,9 @@ function updatePhaseInfo() {
   }
 }
 
+// FIXED: Mathematical offset securely pushes Earth to the left when the right-panel is active.
 function updateCameraOffset() {
-  const isBottomPanel = (window.innerWidth <= 1024 && window.innerHeight >= 600) || (window.innerWidth <= 768);
+  const isBottomPanel = window.innerWidth <= 768;
   if (isBottomPanel) { 
     camera.setViewOffset(window.innerWidth, window.innerHeight, 0, window.innerHeight * 0.10, window.innerWidth, window.innerHeight); 
   } else { 
@@ -333,10 +336,8 @@ function animate() {
   moon.getWorldPosition(moonWorldPos);
 
   let physicalDist = Math.abs(sweep);
-
   earth.castShadow = (eclipseMode === 'lunar');
 
-  // --- PERFECTED PHYSICAL LIGHTING ---
   if (eclipseMode === 'solar') {
     let blackout = Math.max(0, 1.0 - (physicalDist / 0.05)); 
     ambientLight.intensity = 0.2 - (blackout * 0.18); 
@@ -357,15 +358,19 @@ function animate() {
   }
 
   if (activeCameraMode === 'earth') {
+    // FIXED: Dynamically un-zooms the camera when viewed on mobile to prevent claustrophobia
+    let zoomScalar = window.innerWidth <= 768 ? 7.5 : 5.5;
     let dirToMoon = moonWorldPos.clone().normalize();
-    targetCamPos.copy(dirToMoon.multiplyScalar(5.5)); 
+    targetCamPos.copy(dirToMoon.multiplyScalar(zoomScalar)); 
     targetCtrlPos.copy(moonWorldPos);
   } else if (activeCameraMode === 'moon') {
+    let zoomScalar = window.innerWidth <= 768 ? 2.8 : 1.9;
     let dirToEarth = moonWorldPos.clone().negate().normalize();
-    targetCamPos.copy(moonWorldPos).add(dirToEarth.multiplyScalar(1.9)); 
+    targetCamPos.copy(moonWorldPos).add(dirToEarth.multiplyScalar(zoomScalar)); 
     targetCtrlPos.set(0, 0, 0);
   } else if (activeCameraMode === 'reset') {
-    targetCamPos.set(-105, 20, 0); targetCtrlPos.set(0, 0, 0);
+    let resetZ = window.innerWidth <= 768 ? -150 : -120;
+    targetCamPos.set(resetZ, 25, 0); targetCtrlPos.set(0, 0, 0);
   }
 
   if (activeCameraMode !== 'free') {
@@ -389,8 +394,6 @@ function animate() {
 
   updatePhaseInfo();
   renderer.render(scene, camera);
-
-  // DELETED the resizeTelescope() call from here to kill layout thrashing and restore 60FPS!
 
   const dirToMoon = moonWorldPos.clone().sub(earth.position).normalize();
   telescopeCamera.position.copy(earth.position).add(dirToMoon.multiplyScalar(5.3));
