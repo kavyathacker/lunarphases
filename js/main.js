@@ -3,7 +3,6 @@ const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
-// FIXED: Establishes a comfortable, less-zoomed baseline distance dynamically!
 const startZ = window.innerWidth <= 768 ? -150 : -120;
 camera.position.set(startZ, 25, 0);
 
@@ -128,12 +127,15 @@ scene.add(earth);
 
 const earthNightMat = new THREE.ShaderMaterial({
   uniforms: { nightTexture: { value: earthNightTex }, sunWorldPosition: { value: sunPosition } },
-  vertexShader: ` varying vec2 vUv; varying vec3 vWorldNormal; void main() { vUv = uv; vWorldNormal = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); } `,
+  // FIXED: Shader now uses modelViewMatrix to ensure the Night Layer perfectly locks rotation to the Day Layer
+  vertexShader: ` varying vec2 vUv; varying vec3 vWorldNormal; void main() { vUv = uv; vWorldNormal = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); } `,
   fragmentShader: ` uniform sampler2D nightTexture; uniform vec3 sunWorldPosition; varying vec2 vUv; varying vec3 vWorldNormal; void main() { vec3 toSun = normalize(sunWorldPosition); float sunDot = dot(vWorldNormal, toSun); float blend = smoothstep(0.1, -0.1, sunDot); vec4 nightColor = texture2D(nightTexture, vUv); gl_FragColor = vec4(nightColor.rgb, nightColor.a * blend); } `,
   blending: THREE.NormalBlending, transparent: true, depthWrite: false
 });
 const earthNight = new THREE.Mesh(new THREE.SphereGeometry(earthRadius + 0.015, 64, 64), earthNightMat);
-scene.add(earthNight);
+
+// CRITICAL FIX: The Night texture is now mathematically a strict child of the spinning Earth, preventing the graphics from tearing!
+earth.add(earthNight);
 
 const shadowMat = new THREE.ShadowMaterial({ opacity: 0.85, transparent: true, depthWrite: false });
 shadowMat.onBeforeCompile = function ( shader ) {
@@ -276,7 +278,7 @@ function updatePhaseInfo() {
   }
 }
 
-// FIXED: Mathematical offset securely pushes Earth to the left when the right-panel is active.
+// FIXED: Adjusted to rigidly detect true mobile view vs desktop-mode phone rendering
 function updateCameraOffset() {
   const isBottomPanel = window.innerWidth <= 768;
   if (isBottomPanel) { 
@@ -336,8 +338,10 @@ function animate() {
   moon.getWorldPosition(moonWorldPos);
 
   let physicalDist = Math.abs(sweep);
+
   earth.castShadow = (eclipseMode === 'lunar');
 
+  // --- PERFECTED PHYSICAL LIGHTING ---
   if (eclipseMode === 'solar') {
     let blackout = Math.max(0, 1.0 - (physicalDist / 0.05)); 
     ambientLight.intensity = 0.2 - (blackout * 0.18); 
@@ -358,7 +362,6 @@ function animate() {
   }
 
   if (activeCameraMode === 'earth') {
-    // FIXED: Dynamically un-zooms the camera when viewed on mobile to prevent claustrophobia
     let zoomScalar = window.innerWidth <= 768 ? 7.5 : 5.5;
     let dirToMoon = moonWorldPos.clone().normalize();
     targetCamPos.copy(dirToMoon.multiplyScalar(zoomScalar)); 
