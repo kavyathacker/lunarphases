@@ -54,7 +54,7 @@ body, html {
   font-weight: 600; cursor: pointer; transition: all 0.1s ease; font-family: inherit;
 }
 .action-btn:hover { background: #27272a; border-color: #ffffff; }
-.action-btn.active { background: #ffffff; color: #000000; border-color: #ffffff; font-weight: 700; }
+.action-btn.active { background: #ffffff; color: #000000; border-color: #000000; font-weight: 700; }
 .full-width { grid-column: span 2; width: 100%; }
 
 .calendar-jump { display: flex; gap: 6px; border-top: 1px solid #3f3f46; padding-top: 12px; }
@@ -79,7 +79,7 @@ input[type="range"] { accent-color: #ffffff; cursor: pointer; width: 130px; heig
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #ffffff; border-radius: 50%; }
 
 /* =======================================================================
-   1. MOBILE SCROLL-FREE COMPRESSION (Flawless fit for <= 768px, < 40% height)
+   1. MOBILE VIEW COMPRESSION (Strictly < 40% Screen Height)
    ======================================================================= */
 @media (max-width: 768px) {
   #top-bar { top: 12px; left: 12px; }
@@ -91,89 +91,88 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16p
   .action-btn { font-size: 0.65rem; padding: 6px 4px; }
   .mode-title { font-size: 0.6rem; margin-bottom: 4px; }
   
-  /* Panel locked to bottom, dynamically adjusting to take minimal space */
+  /* Aggressively compressed to hug the bottom screen edge */
   #info-panel { 
-    top: auto; bottom: 55px; left: 10px; right: 10px; width: auto; 
-    border-radius: 12px; padding: 8px; gap: 6px;
+    top: auto; bottom: 50px; left: 8px; right: 8px; width: auto; 
+    border-radius: 10px; padding: 8px 6px; gap: 4px;
   }
   
-  .panel-top-row { gap: 10px; align-items: center; }
-  #telescope-wrapper { width: 55px; height: 55px; border-width: 1px; }
-  .reticle { width: 40px; height: 40px; border-width: 1px; }
+  .panel-top-row { gap: 8px; align-items: center; }
+  #telescope-wrapper { width: 50px; height: 50px; border-width: 1px; }
+  .reticle { width: 35px; height: 35px; border-width: 1px; }
   
   .phase-card { padding: 0; background: transparent; border: none; }
-  #phase-title { font-size: 0.95rem; margin-bottom: 2px; }
-  #phase-illumination { font-size: 0.65rem; margin-bottom: 0; }
+  #phase-title { font-size: 0.85rem; margin-bottom: 0; }
+  #phase-illumination { font-size: 0.6rem; margin-bottom: 0; }
   #phase-description { display: none; } 
   
-  /* Ultra-compact grid */
-  .btn-grid.phases { grid-template-columns: repeat(4, 1fr); gap: 4px; }
-  .phase-btn { padding: 6px 2px; font-size: 0.55rem; border-radius: 4px; }
+  /* Ultra-tight 4x2 phase grid */
+  .btn-grid.phases { grid-template-columns: repeat(4, 1fr); gap: 3px; }
+  .phase-btn { padding: 5px 2px; font-size: 0.5rem; border-radius: 4px; }
   
-  /* Merge Calendar and Live button onto a single line */
-  .calendar-jump { padding-top: 6px; border-top: 1px solid #3f3f46; gap: 6px; flex-direction: row; align-items: center; }
-  #calendar-picker { padding: 6px 8px; font-size: 0.75rem; border-width: 1px; flex-grow: 1; }
-  #btn-live-date { padding: 6px 12px; border-width: 1px; flex-grow: 0; }
+  .calendar-jump { padding-top: 4px; border-top: none; gap: 4px; flex-direction: row; align-items: center; }
+  #calendar-picker { padding: 4px 6px; font-size: 0.65rem; border-width: 1px; flex-grow: 1; }
+  #btn-live-date { padding: 4px 8px; font-size: 0.65rem; border-width: 1px; flex-grow: 0; }
 
-  .tidal-control-container { border-top: 1px solid #3f3f46; padding-top: 6px; }
-  #btn-tidal-toggle { padding: 8px; font-size: 0.7rem; border-width: 1px; }
+  .tidal-control-container { border-top: none; padding-top: 0; }
+  #btn-tidal-toggle { padding: 6px; font-size: 0.65rem; border-width: 1px; }
 
-  .action-grid { gap: 4px; padding-top: 6px; border-top: 1px solid #3f3f46; }
+  .action-grid { gap: 3px; padding-top: 4px; border-top: none; }
   .eclipse-control { padding-top: 0px; }
 
-  /* Restored clean, readable sliders with proper dot tracks */
+  /* Perfectly aligned, text-free bottom bar */
   #control-bar { 
-    bottom: 8px; padding: 8px 12px; gap: 8px; width: calc(100% - 20px); 
+    bottom: 8px; padding: 6px 12px; gap: 6px; width: calc(100% - 16px); 
     justify-content: space-between; border-radius: 20px; 
   }
-  .ctrl-btn { padding: 6px 12px; font-size: 0.65rem; border-width: 1px; }
-  .slider-group { flex-grow: 1; justify-content: center; gap: 6px; }
-  .slider-group label { display: block; font-size: 0.55rem; } 
-  input[type="range"] { width: 100%; max-width: 70px; height: 4px; }
+  .ctrl-btn { padding: 6px 10px; font-size: 0.65rem; border-width: 1px; }
+  .slider-group label { display: none !important; } /* Hard override to kill SPEED/ORBIT text */
+  .slider-group { flex-grow: 1; justify-content: center; margin: 0 4px; }
+  input[type="range"] { width: 100%; max-width: 80px; height: 4px; }
   input[type="range"]::-webkit-slider-thumb { width: 12px; height: 12px; }
 }
 
 /* =======================================================================
-   2. DESKTOP SITE MODE ON PHONE (Massive up-scaling to beat resolution shrink)
+   2. DESKTOP SITE MODE ON PHONE (Perfectly Sized Touch Targets)
    ======================================================================= */
 @media (pointer: coarse) and (min-width: 769px) {
-  #top-bar { top: 40px; left: 40px; }
-  .logo { font-size: 2.2rem; }
-  .subtitle { font-size: 1.2rem; margin-top: 8px; }
+  #top-bar { top: 24px; left: 24px; }
+  .logo { font-size: 1.4rem; }
+  .subtitle { font-size: 0.8rem; }
 
-  #top-left-ui { top: 130px; left: 40px; gap: 16px; }
-  #solar-modes, #tidal-modes { padding: 20px; border-width: 2px; }
-  .action-btn { padding: 20px 16px; font-size: 1.4rem; border-width: 2px; border-radius: 12px; }
-  .mode-title { font-size: 1.1rem; margin-bottom: 12px; }
+  #top-left-ui { top: 85px; left: 24px; gap: 10px; }
+  #solar-modes, #tidal-modes { padding: 14px; }
+  .action-btn { padding: 12px 10px; font-size: 0.85rem; }
+  .mode-title { font-size: 0.75rem; margin-bottom: 8px; }
 
-  #info-panel { width: 500px; padding: 28px; gap: 20px; right: 40px; top: 40px; border-width: 2px; border-radius: 20px; }
+  /* Keeps desktop layout logic, but slightly wider and highly tappable */
+  #info-panel { width: 340px; padding: 18px; right: 24px; top: 24px; gap: 14px; }
   
-  .panel-top-row { gap: 20px; }
-  #telescope-wrapper { width: 150px; height: 150px; border-width: 3px; border-radius: 12px; }
-  .reticle { width: 110px; height: 110px; border-width: 3px; }
+  .panel-top-row { gap: 14px; }
+  #telescope-wrapper { width: 105px; height: 105px; }
+  .reticle { width: 80px; height: 80px; }
   
-  #phase-title { font-size: 2rem; margin-bottom: 8px; }
-  #phase-illumination { font-size: 1.3rem; margin-bottom: 8px; }
-  #phase-description { font-size: 1.1rem; line-height: 1.4; }
+  #phase-title { font-size: 1.3rem; }
+  #phase-illumination { font-size: 0.9rem; }
+  #phase-description { font-size: 0.8rem; }
 
-  .btn-grid { gap: 12px; }
-  .phase-btn { padding: 18px 8px; font-size: 1.2rem; border-width: 2px; border-radius: 10px; }
+  .btn-grid { gap: 8px; }
+  .phase-btn { padding: 10px 6px; font-size: 0.8rem; }
   
-  .calendar-jump { padding-top: 24px; gap: 16px; border-width: 2px; }
-  #calendar-picker { padding: 16px 20px; font-size: 1.4rem; border-width: 2px; border-radius: 10px; }
-  #btn-live-date { padding: 16px 24px; font-size: 1.3rem; border-width: 2px; border-radius: 10px; }
+  .calendar-jump { padding-top: 14px; gap: 8px; }
+  #calendar-picker { padding: 10px; font-size: 0.9rem; }
+  #btn-live-date { padding: 10px; font-size: 0.9rem; }
 
-  .tidal-control-container { padding-top: 24px; border-width: 2px; }
-  #btn-tidal-toggle { padding: 20px; font-size: 1.4rem; border-width: 2px; border-radius: 12px; }
+  .tidal-control-container { padding-top: 14px; }
+  #btn-tidal-toggle { padding: 12px; font-size: 0.9rem; }
 
-  .action-grid { gap: 12px; padding-top: 24px; border-width: 2px; }
-  .eclipse-control { padding-top: 12px; }
+  .action-grid { gap: 8px; padding-top: 14px; }
 
   #control-bar { 
-    bottom: 40px; padding: 24px 48px; gap: 40px; border-radius: 60px; border-width: 2px;
+    bottom: 24px; padding: 16px 32px; gap: 28px; border-radius: 50px; 
   }
-  .ctrl-btn { padding: 20px 40px; font-size: 1.5rem; border-radius: 40px; border-width: 2px; }
-  .slider-group { font-size: 1.3rem; gap: 20px; }
-  input[type="range"] { width: 260px; height: 12px; border-radius: 6px; }
-  input[type="range"]::-webkit-slider-thumb { width: 32px; height: 32px; }
+  .ctrl-btn { padding: 12px 24px; font-size: 0.95rem; }
+  .slider-group { font-size: 0.85rem; gap: 12px; }
+  input[type="range"] { width: 150px; height: 8px; }
+  input[type="range"]::-webkit-slider-thumb { width: 20px; height: 20px; }
 }
