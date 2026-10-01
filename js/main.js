@@ -2,7 +2,6 @@
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 
-// FIXED: Base FOV is initialized, but dynamically updated for Mobile Zoom Out
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
 const startZ = window.innerWidth <= 768 ? -220 : -120;
 camera.position.set(startZ, 25, 0);
@@ -266,19 +265,22 @@ shadowsGroup.visible = false;
 let isPlaying = true;
 let orbitSpeed = 1.0;
 let orbitalAnomaly = 0; 
+
+// FIXED: Variables for Absolute Camera Lock Tracking
 let activeCameraMode = 'free'; 
-let isCamLocked = false; // FIXED: Controls strict mathematical camera lock to prevent drag
+let isCamLocked = false; 
+let cameraTransitionTimer = 0; 
 
 let eclipseMode = 'none'; 
 let eclipseSubMode = 'total'; 
 let solarDistanceMode = 'apogee'; 
 let tidalMode = 'none'; 
 
-// FIXED: Clean Camera Switching Function
 function setCameraMode(mode) {
   if (activeCameraMode !== mode) {
     activeCameraMode = mode;
-    isCamLocked = false; // Always allow the smooth transition before locking again
+    isCamLocked = false; 
+    cameraTransitionTimer = 0; // Reset the timeout counter!
   }
 }
 
@@ -331,7 +333,7 @@ function updatePhaseInfo() {
 function updateCameraOffset() {
   const isMobile = window.innerWidth <= 768;
   
-  // FIXED: Expands Field of View strictly on Mobile to instantly zoom everything VERY out!
+  // Mobile Zoom-Out Override
   camera.fov = isMobile ? 85 : 45; 
   
   if (isMobile) { 
@@ -446,7 +448,6 @@ function animate() {
     moonPenumbra.position.copy(moonWorldPos);
   }
 
-  // FIXED: Camera physical targets optimized to compliment the new ultra-wide Mobile FOV!
   if (activeCameraMode === 'tidal') {
     let zoomScalar = window.innerWidth <= 768 ? 220 : 110;
     targetCamPos.set(0.1, zoomScalar, 0.1); 
@@ -465,14 +466,22 @@ function animate() {
     targetCamPos.set(20, resetY, resetZ); targetCtrlPos.set(20, 0, 0);
   }
 
+  // FIXED: The Foolproof Absolute Lock
   if (activeCameraMode !== 'free') {
     let camDist = camera.position.distanceTo(targetCamPos);
     let ctrlDist = controls.target.distanceTo(targetCtrlPos);
     
-    // FIXED: The Absolute Lock! Once the camera glides close enough to the target,
-    // it perfectly forces 0 lag and 0 dragging regardless of how fast the orbit is moving.
-    if (camDist < 0.5 && ctrlDist < 0.5) {
-      isCamLocked = true;
+    if (!isCamLocked) {
+      cameraTransitionTimer += delta; 
+      
+      // If the camera physically catches the target, OR if exactly 1 second has passed, FORCE the lock.
+      // This mathematically guarantees 0 lag and 0 dragging regardless of orbit speed.
+      if ((camDist < 1.0 && ctrlDist < 1.0) || cameraTransitionTimer > 1.0) {
+        isCamLocked = true;
+      } else {
+        camera.position.lerp(targetCamPos, 0.1); 
+        controls.target.lerp(targetCtrlPos, 0.1);
+      }
     }
 
     if (isCamLocked) {
@@ -481,9 +490,6 @@ function animate() {
       if (activeCameraMode === 'reset' || activeCameraMode === 'tidal') {
         setCameraMode('free'); 
       }
-    } else {
-      camera.position.lerp(targetCamPos, 0.08); 
-      controls.target.lerp(targetCtrlPos, 0.08);
     }
     camera.lookAt(controls.target);
   } else {
