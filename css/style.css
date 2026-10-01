@@ -1,169 +1,170 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  user-select: none;
-}
+/* HIGH-CONTRAST MINIMALIST UI (ANTI-GLARE) */
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 
 body, html {
-  width: 100%;
-  height: 100vh;
-  overflow: hidden;
-  background-color: #030508;
+  width: 100%; height: 100vh; overflow: hidden;
+  background-color: #000000; 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color: #f1f5f9;
+  color: #ffffff; 
 }
 
 #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; touch-action: none; }
-#top-bar { position: absolute; top: 18px; left: 20px; z-index: 10; pointer-events: none; }
 
-.logo { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #38bdf8; text-shadow: 0 0 12px rgba(56, 189, 248, 0.4); }
-.subtitle { font-size: 0.8rem; color: #94a3b8; margin-top: 2px; }
-
-/* =========================================================
-   1. STANDARD PC LAYOUT 
-   (Strictly untouched, explicitly for mouse users)
-   ========================================================= */
-#info-panel {
-  position: absolute; top: 14px; right: 14px; width: 275px; max-height: calc(100vh - 40px);
-  background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px); border-radius: 12px; padding: 14px; z-index: 10;
-  display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  overflow-y: auto; overflow-x: hidden;
+/* SOLID MATTE PANELS FOR MAXIMUM SUNLIGHT VISIBILITY */
+.glass-panel {
+  background: #09090b; 
+  border: 1px solid #52525b; 
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
 }
 
-.panel-header { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #cbd5e1; }
+/* TYPOGRAPHY */
+#top-bar { position: absolute; top: 24px; left: 24px; z-index: 10; pointer-events: none; }
+.logo { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.15em; color: #ffffff; text-transform: uppercase; }
+.subtitle { font-size: 0.7rem; font-weight: 600; color: #d4d4d8; margin-top: 4px; letter-spacing: 0.08em; text-transform: uppercase; }
+.mode-title { font-size: 0.65rem; color: #e4e4e7; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; text-align: center; margin-bottom: 8px; }
 
-#telescope-wrapper { position: relative; width: 100%; height: 120px; background: #000; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); overflow: hidden; flex-shrink: 0; }
+/* PANELS */
+#top-left-ui { position: absolute; top: 80px; left: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; }
+#solar-modes, #tidal-modes { border-radius: 8px; padding: 12px; display: none; flex-direction: column; }
+#solar-modes.active, #tidal-modes.active { display: flex; }
+.btn-group { display: flex; gap: 6px; }
+
+#info-panel {
+  position: absolute; top: 24px; right: 24px; width: 310px;
+  border-radius: 12px; padding: 16px; z-index: 10;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* TELESCOPE & PHASE */
+.panel-top-row { display: flex; gap: 12px; align-items: stretch; }
+#telescope-wrapper { position: relative; width: 95px; height: 95px; background: #000; border-radius: 6px; border: 2px solid #71717a; overflow: hidden; flex-shrink: 0; }
 #telescope-canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; display: block; }
-.reticle { position: absolute; top: 50%; left: 50%; width: 90px; height: 90px; transform: translate(-50%, -50%); border: 1px dashed rgba(56, 189, 248, 0.25); border-radius: 50%; pointer-events: none; }
+.reticle { position: absolute; top: 50%; left: 50%; width: 75px; height: 75px; transform: translate(-50%, -50%); border: 2px dashed rgba(255, 255, 255, 0.4); border-radius: 50%; pointer-events: none; }
 
-.phase-card { background: rgba(2, 6, 23, 0.5); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); min-height: 115px; }
-#phase-title { font-size: 1.05rem; font-weight: 700; color: #f8fafc; }
-#phase-illumination { font-size: 0.75rem; color: #38bdf8; margin-bottom: 3px; }
-#phase-description { font-size: 0.7rem; line-height: 1.25; color: #94a3b8; }
+.phase-card { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
+#phase-title { font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 4px; }
+#phase-illumination { font-size: 0.8rem; color: #e4e4e7; font-weight: 600; margin-bottom: 6px; }
+#phase-description { font-size: 0.75rem; color: #a1a1aa; line-height: 1.35; font-weight: 500;}
 
-.quick-jump label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-.btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 2px; }
-.phase-btn { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0; padding: 6px 3px; border-radius: 5px; font-size: 0.7rem; cursor: pointer; transition: all 0.2s ease; }
-.phase-btn:hover { background: #0284c7; color: #fff; border-color: #38bdf8; }
+/* BUTTONS */
+.btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.action-btn { 
+  background: #18181b; border: 1px solid #52525b; 
+  color: #ffffff; padding: 10px 8px; border-radius: 6px; font-size: 0.75rem; 
+  font-weight: 600; cursor: pointer; transition: all 0.1s ease; font-family: inherit;
+}
+.action-btn:hover { background: #27272a; border-color: #ffffff; }
+.action-btn.active { background: #ffffff; color: #000000; border-color: #ffffff; font-weight: 700; }
+.full-width { grid-column: span 2; width: 100%; }
 
-.calendar-jump { margin-top: 2px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; gap: 5px; }
-.calendar-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-.calendar-header label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-#btn-live-date { padding: 3px 8px; font-size: 0.65rem; margin: 0; background: rgba(14, 165, 233, 0.2); border-color: #0ea5e9; }
-#btn-live-date:hover { background: #0ea5e9; color: #fff; }
-#calendar-picker { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0; padding: 6px; border-radius: 5px; font-size: 0.8rem; font-family: inherit; outline: none; cursor: pointer; color-scheme: dark; width: 100%; }
+.calendar-jump { display: flex; gap: 6px; border-top: 1px solid #3f3f46; padding-top: 12px; }
+#calendar-picker { flex-grow: 1; background: #18181b; border: 1px solid #52525b; color: #ffffff; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; font-family: inherit; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark; }
 
-.action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 2px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
-#btn-shadows { grid-column: span 2; }
-.action-btn { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #e2e8f0; padding: 6px 4px; border-radius: 5px; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
-.action-btn:hover { background: #10b981; color: #fff; }
-.action-btn.active { background: #10b981; color: #fff; border-color: #059669; box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+.action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; border-top: 1px solid #3f3f46; padding-top: 12px; }
+.eclipse-control { display: none; padding-top: 6px; }
+.eclipse-control.active { display: flex; }
 
-.eclipse-control { display: flex; justify-content: space-between; align-items: center; padding-top: 4px; }
-.eclipse-control label { font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-#eclipse-slider { width: 50%; height: 14px; accent-color: #10b981; cursor: pointer; }
+/* BOTTOM CONTROL BAR */
+#control-bar { 
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); 
+  padding: 14px 28px; border-radius: 40px; display: flex; align-items: center; gap: 24px; z-index: 10; width: max-content; 
+}
+.ctrl-btn { background: #27272a; border: 1px solid #52525b; color: #ffffff; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.1s; font-family: inherit; }
+.ctrl-btn.main { background: #ffffff; color: #000000; font-weight: 700; border-color: #ffffff; }
+.ctrl-btn:active { transform: scale(0.95); }
+.slider-group { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; color: #e4e4e7; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+input[type="range"] { accent-color: #ffffff; cursor: pointer; width: 130px; height: 6px; background: #3f3f46; border-radius: 3px; -webkit-appearance: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #ffffff; border-radius: 50%; }
 
-#control-bar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(12px); padding: 10px 20px; border-radius: 30px; display: flex; align-items: center; gap: 16px; z-index: 10; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6); width: max-content; max-width: 95%; }
-.ctrl-btn { background: #0284c7; border: none; color: #fff; font-weight: 600; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; transition: background 0.2s; }
-.ctrl-btn:hover { background: #0369a1; }
-.ctrl-btn.secondary { background: rgba(51, 65, 85, 0.8); }
-.ctrl-btn.secondary:hover { background: #475569; }
-
-.slider-group { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #cbd5e1; }
-input[type="range"] { accent-color: #38bdf8; cursor: pointer; width: 140px; height: 16px; }
-
-/* =========================================================
-   2. COMPACT BOTTOM PANEL 
-   (Strictly true Mobile Browsers <= 768px, untouched)
-   ========================================================= */
+/* =======================================================================
+   1. MOBILE SCROLL-FREE COMPRESSION (Flawless fit for <= 768px)
+   ======================================================================= */
 @media (max-width: 768px) {
-  #top-bar { top: 6px; left: 6px; }
+  #top-bar { top: 12px; left: 12px; }
   .logo { font-size: 1rem; }
   .subtitle { font-size: 0.6rem; }
   
-  #info-panel {
-    top: auto; bottom: 38px; left: 0; right: 0; width: 100%; height: max-content; overflow: hidden; 
-    border-radius: 16px 16px 0 0; padding: 4px; 
-    display: grid; 
-    grid-template-columns: 90px 1fr; 
-    gap: 2px 4px; align-content: start; border-bottom: none;
+  #top-left-ui { top: 48px; left: 12px; gap: 4px; }
+  #solar-modes, #tidal-modes { padding: 8px; }
+  .action-btn { font-size: 0.65rem; padding: 8px 6px; }
+  .mode-title { font-size: 0.6rem; margin-bottom: 6px; }
+  
+  #info-panel { 
+    top: auto; bottom: 65px; left: 12px; right: 12px; width: auto; 
+    border-radius: 12px; padding: 10px 8px; gap: 6px;
   }
   
-  .panel-header { display: none; } 
+  .panel-top-row { gap: 8px; }
+  #telescope-wrapper { width: 70px; height: 70px; border-width: 1px; }
+  .reticle { width: 55px; height: 55px; border-width: 1px; }
   
-  #telescope-wrapper { 
-    grid-column: 1; grid-row: 1 / 6; 
-    height: 100%; 
-    min-height: 90px; 
-    border-radius: 8px; 
-  }
-  .reticle { width: 40px; height: 40px; }
-  
-  .phase-card { grid-column: 2; grid-row: 1; padding: 2px 4px; display: flex; flex-direction: column; justify-content: center; min-height: auto; }
-  #phase-title { font-size: 0.7rem; margin-bottom: 0px; }
-  #phase-illumination { font-size: 0.55rem; margin-bottom: 0px; }
+  #phase-title { font-size: 0.95rem; }
+  #phase-illumination { font-size: 0.65rem; margin-bottom: 2px; }
   #phase-description { display: none; } 
   
-  .quick-jump { grid-column: 2; grid-row: 2; }
-  .quick-jump label { display: none; }
-  .btn-grid { grid-template-columns: repeat(4, 1fr); gap: 2px; margin-top: 0; }
-  .phase-btn { padding: 4px 0; font-size: 0.45rem; border-radius: 4px; text-align: center; }
+  .btn-grid.phases { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .phase-btn { padding: 6px 2px; font-size: 0.55rem; }
   
-  .calendar-jump { grid-column: 2; grid-row: 3; padding-top: 0; display: flex; flex-direction: column; gap: 2px; border-top: none; }
-  .calendar-header label { display: none; } 
-  #btn-live-date { padding: 3px 4px; font-size: 0.5rem; width: 100%; }
-  #calendar-picker { padding: 3px; font-size: 0.6rem; width: 100%; }
+  .calendar-jump { padding-top: 6px; border-top: none; gap: 4px; }
+  #calendar-picker { padding: 6px 8px; font-size: 0.75rem; border-width: 1px; }
+  #btn-live-date { padding: 6px 10px; border-width: 1px; }
 
-  .action-grid { grid-column: 2; grid-row: 4; display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; padding-top: 2px; margin-top: 0; border: none; }
-  #btn-shadows { grid-column: span 2; padding: 3px 0; font-size: 0.5rem; }
-  .action-btn { padding: 4px 0; font-size: 0.5rem; border-radius: 4px; letter-spacing: -0.2px; }
+  .tidal-control-container { border-top: none; padding-top: 0; }
+  #btn-tidal-toggle { padding: 8px; font-size: 0.7rem; border-width: 1px; }
 
-  .eclipse-control { grid-column: 2; grid-row: 5; flex-direction: column; align-items: flex-start; padding-top: 2px; }
-  .eclipse-control label { font-size: 0.45rem; margin-bottom: 2px; }
-  #eclipse-slider { width: 100%; height: 10px; }
+  .action-grid { gap: 4px; padding-top: 6px; border-top: none; }
+  .eclipse-control { padding-top: 0px; }
 
-  #control-bar { bottom: 0; left: 0; width: 100%; max-width: 100%; height: 36px; transform: none; border-radius: 0; padding: 0 4px; justify-content: space-around; }
-  .ctrl-btn { padding: 3px 6px; font-size: 0.55rem; }
-  .slider-group { font-size: 0.55rem; gap: 4px; }
-  #speed-slider, #phase-slider { width: 50px; height: 10px; }
+  #control-bar { 
+    bottom: 12px; padding: 10px 16px; gap: 10px; width: calc(100% - 24px); 
+    justify-content: space-between; border-radius: 20px; 
+  }
+  .ctrl-btn { padding: 8px 14px; font-size: 0.75rem; border-width: 1px; }
+  .slider-group label { display: none; } 
+  input[type="range"] { width: 85px; height: 4px; }
+  input[type="range"]::-webkit-slider-thumb { width: 14px; height: 14px; }
 }
 
-/* =========================================================
-   3. DESKTOP SITE MODE ON PHONE / TOUCH SCALING
-   (Triggers when width > 768px but device is a touch screen)
-   ========================================================= */
+/* =======================================================================
+   2. DESKTOP SITE MODE ON PHONE / TOUCH SCALING RESTORED
+   ======================================================================= */
 @media (pointer: coarse) and (min-width: 769px) {
-  /* FIXED: Scaled down by ~8% to give the simulation more breathing room while remaining tap-able! */
-  #info-panel { width: 310px; padding: 16px; gap: 10px; border-radius: 14px; }
-  .panel-header { font-size: 0.95rem; }
-  #telescope-wrapper { height: 145px; border-radius: 10px; }
-  .reticle { width: 100px; height: 100px; }
-  .phase-card { padding: 12px; border-radius: 8px; min-height: 155px; } 
-  #phase-title { font-size: 1.4rem; }
-  #phase-illumination { font-size: 1.05rem; margin-bottom: 4px; }
-  #phase-description { font-size: 0.95rem; line-height: 1.3; }
-  
-  .quick-jump label, .calendar-header label { font-size: 0.95rem; margin-bottom: 4px; }
-  #btn-live-date { font-size: 0.85rem; padding: 6px 10px; }
-  .btn-grid { gap: 8px; margin-top: 5px; }
-  .phase-btn { padding: 12px 6px; font-size: 1.05rem; border-radius: 8px; }
-  .calendar-jump { padding-top: 16px; margin-top: 6px; }
-  #calendar-picker { padding: 12px; font-size: 1.15rem; border-radius: 8px; }
+  #top-bar { top: 28px; left: 28px; }
+  .logo { font-size: 1.5rem; }
+  .subtitle { font-size: 0.85rem; }
 
-  .action-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; padding-top: 14px; }
-  .action-btn { padding: 12px 6px; font-size: 1.05rem; border-radius: 8px; }
-  
-  .eclipse-control { padding-top: 12px; }
-  .eclipse-control label { font-size: 0.85rem; }
-  #eclipse-slider { width: 55%; height: 20px; }
+  #top-left-ui { top: 90px; left: 28px; gap: 12px; }
+  #solar-modes, #tidal-modes { padding: 16px; }
+  .action-btn { padding: 12px 10px; font-size: 0.95rem; }
+  .mode-title { font-size: 0.8rem; margin-bottom: 10px; }
 
-  #control-bar { bottom: 20px; padding: 14px 24px; gap: 16px; border-radius: 40px; }
-  .ctrl-btn { padding: 14px 24px; font-size: 1.2rem; border-radius: 25px; }
-  .slider-group { font-size: 1.1rem; gap: 10px; }
-  #speed-slider, #phase-slider { width: 160px; height: 28px; }
+  #info-panel { width: 360px; padding: 20px; gap: 16px; right: 28px; top: 28px; }
   
-  .logo { font-size: 1.7rem; }
-  .subtitle { font-size: 1.05rem; margin-top: 4px; }
+  .panel-top-row { gap: 16px; }
+  #telescope-wrapper { width: 110px; height: 110px; }
+  .reticle { width: 85px; height: 85px; }
+  
+  #phase-title { font-size: 1.35rem; }
+  #phase-illumination { font-size: 0.95rem; }
+  #phase-description { font-size: 0.85rem; }
+
+  .btn-grid { gap: 8px; }
+  .phase-btn { padding: 12px 6px; font-size: 0.9rem; }
+  
+  .calendar-jump { padding-top: 16px; gap: 8px; }
+  #calendar-picker { padding: 10px 14px; font-size: 1rem; }
+  #btn-live-date { padding: 10px 16px; font-size: 0.9rem; }
+
+  .tidal-control-container { padding-top: 4px; }
+  #btn-tidal-toggle { padding: 12px; font-size: 1rem; }
+
+  .action-grid { gap: 8px; padding-top: 16px; }
+
+  #control-bar { 
+    bottom: 30px; padding: 18px 36px; gap: 32px; border-radius: 50px; 
+  }
+  .ctrl-btn { padding: 14px 28px; font-size: 1rem; border-radius: 30px; }
+  .slider-group { font-size: 0.9rem; gap: 14px; }
+  input[type="range"] { width: 180px; height: 8px; }
+  input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
 }
