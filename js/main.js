@@ -6,12 +6,13 @@ const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerH
 const startZ = window.innerWidth <= 768 ? -150 : -120;
 camera.position.set(startZ, 25, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputEncoding = THREE.sRGBEncoding; 
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// OPTIMIZATION: Removed SoftShadowMap to prevent extreme GPU fill-rate death on mobile
+renderer.shadowMap.type = THREE.PCFShadowMap; 
 container.appendChild(renderer.domElement);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -24,20 +25,18 @@ controls.target.set(0, 0, 0);
 const telescopeCanvas = document.getElementById('telescope-canvas');
 const telescopeRenderer = new THREE.WebGLRenderer({ canvas: telescopeCanvas, antialias: true });
 telescopeRenderer.setSize(telescopeCanvas.clientWidth, telescopeCanvas.clientHeight, false);
-telescopeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// OPTIMIZATION: Forced to 1. This prevents the PiP from calculating 4x the pixels on Retina mobile screens
+telescopeRenderer.setPixelRatio(1); 
 telescopeRenderer.outputEncoding = THREE.sRGBEncoding;
 
 const telescopeCamera = new THREE.PerspectiveCamera(24, telescopeCanvas.clientWidth / telescopeCanvas.clientHeight, 1.0, 500);
 
-// --- STRICT CAMERA LAYERS (FIX FOR TIDAL ARROW) ---
+// --- STRICT CAMERA LAYERS ---
 const SUN_LAYER = 1;
 const SHADOW_CONES_LAYER = 2; 
-const TIDAL_ARROW_LAYER = 4; // NEW: Dedicated layer for the physics arrow
+const TIDAL_ARROW_LAYER = 4; 
 
-// The Telescope Camera strictly looks at Layer 0 (the Moon & Earth). It completely ignores Layer 4!
 telescopeCamera.layers.set(0); 
-
-// The Main user camera is permitted to see all environmental layers, including the Arrow.
 camera.layers.enable(SUN_LAYER);
 camera.layers.enable(SHADOW_CONES_LAYER); 
 camera.layers.enable(TIDAL_ARROW_LAYER); 
@@ -59,8 +58,9 @@ dirLight.shadow.camera.bottom = -30;
 dirLight.shadow.camera.near = 10;
 dirLight.shadow.camera.far = 150;
 dirLight.shadow.bias = -0.005;
-dirLight.shadow.mapSize.width = 4096;
-dirLight.shadow.mapSize.height = 4096;
+// OPTIMIZATION: Cut from 4096 to 2048. This frees up massive amounts of VRAM and prevents extreme loading times.
+dirLight.shadow.mapSize.width = 2048; 
+dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
 
 const ambientLight = new THREE.AmbientLight(0x111111, 0.2);
@@ -100,7 +100,7 @@ const sunTex = safeLoad('assets/8k_sun.jpg', '#f59e0b');
 
 // --- STARFIELD ---
 const starsGeo = new THREE.BufferGeometry();
-const starCount = 2200;
+const starCount = 1500; // Scaled down slightly to save memory
 const starPos = new Float32Array(starCount * 3);
 for (let i = 0; i < starCount * 3; i += 3) {
   const u = Math.random(); const v = Math.random();
@@ -199,7 +199,6 @@ moon.receiveShadow = true;
 moon.rotation.order = 'YXZ'; 
 moonWrapper.add(moon);
 
-// A clean, elegant minimal blue arrow representing the Tidal axis
 const tidalArrowGroup = new THREE.Group();
 const shaftMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 }); 
 const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 5), shaftMat);
@@ -210,7 +209,6 @@ const head = new THREE.Mesh(new THREE.ConeGeometry(1.0, 2.5, 16), shaftMat);
 head.rotateX(-Math.PI / 2);
 head.position.set(0, 0, -moonRadius - 6.2);
 
-// FIXED: Opts the arrow parts exclusively into Layer 4. The Telescope camera cannot see them!
 shaft.layers.set(TIDAL_ARROW_LAYER);
 head.layers.set(TIDAL_ARROW_LAYER);
 
@@ -240,13 +238,16 @@ moonOrbitPlane.add(new THREE.Line(ringGeo, ringMat));
 
 // --- 5. UMBRA & PENUMBRA CONES ---
 const shadowsGroup = new THREE.Group();
-shadowsGroup.visible = false;
+// OPTIMIZATION: Render them instantly on load, then hide them. This stops the shader compiler from freezing the browser later!
+shadowsGroup.visible = true; 
 scene.add(shadowsGroup);
 
 function createCone(radiusTop, radiusBottom, height, colorHex, opacity) {
-  const geo = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 32, 1, true);
+  // OPTIMIZATION: Reduced polygon segments from 32 to 24 to ease GPU load
+  const geo = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 24, 1, true);
   geo.translate(0, height / 2, 0); geo.rotateZ(Math.PI / 2); 
-  const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: opacity, side: THREE.DoubleSide, depthWrite: false });
+  // OPTIMIZATION: Removed side: THREE.DoubleSide. This strictly prevents the browser from rendering the inside of the cone, saving 50% fill rate!
+  const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: opacity, depthWrite: false });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.layers.disable(0); mesh.layers.enable(SHADOW_CONES_LAYER); 
   return mesh;
@@ -256,6 +257,10 @@ shadowsGroup.add(createCone(0, earthRadius, 55.0, 0x444400, 0.08));
 shadowsGroup.add(createCone(13.0, earthRadius, 55.0, 0x444400, 0.02)); 
 shadowsGroup.add(createCone(0, moonRadius, 28.0, 0x888888, 0.10)); 
 shadowsGroup.add(createCone(4.5, moonRadius, 28.0, 0x888888, 0.04)); 
+
+// Pre-compile trick: Render once, then hide.
+renderer.compile(scene, camera);
+shadowsGroup.visible = false; 
 
 // --- SIMULATION DYNAMICS ---
 let isPlaying = true;
@@ -328,7 +333,7 @@ function resizeTelescope() {
   const wrapper = document.getElementById('telescope-wrapper');
   const tWidth = wrapper.clientWidth;
   const tHeight = wrapper.clientHeight;
-  const pixelRatio = window.devicePixelRatio || 1;
+  const pixelRatio = 1; // Locked strictly to 1 for mobile GPU safety
   const expectedWidth = Math.floor(tWidth * pixelRatio);
   const expectedHeight = Math.floor(tHeight * pixelRatio);
 
@@ -397,7 +402,6 @@ function animate() {
   while (diff > Math.PI) diff -= Math.PI * 2;
   while (diff < -Math.PI) diff += Math.PI * 2;
 
-  // TIDAL LOCKING MATH
   if (tidalMode === 'zero') {
     moon.rotation.set(0, -nu, 0);
   } else {
@@ -428,7 +432,6 @@ function animate() {
     moonUmbra.position.copy(moonWorldPos); moonPenumbra.position.copy(moonWorldPos);
   }
 
-  // --- FREEDOM CAMERA LOGIC ---
   if (activeCameraMode === 'tidal') {
     let zoomScalar = window.innerWidth <= 768 ? 160 : 110;
     targetCamPos.set(0.1, zoomScalar, 0.1); 
