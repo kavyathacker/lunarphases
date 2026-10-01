@@ -2,8 +2,9 @@
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 
+// FIXED: Initial load camera pulled way back for mobile browsers to fit the system
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
-const startZ = window.innerWidth <= 768 ? -150 : -120;
+const startZ = window.innerWidth <= 768 ? -220 : -120;
 camera.position.set(startZ, 25, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -11,7 +12,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputEncoding = THREE.sRGBEncoding; 
 renderer.shadowMap.enabled = true;
-// OPTIMIZATION: Removed SoftShadowMap to prevent extreme GPU fill-rate death on mobile
 renderer.shadowMap.type = THREE.PCFShadowMap; 
 container.appendChild(renderer.domElement);
 
@@ -25,7 +25,6 @@ controls.target.set(0, 0, 0);
 const telescopeCanvas = document.getElementById('telescope-canvas');
 const telescopeRenderer = new THREE.WebGLRenderer({ canvas: telescopeCanvas, antialias: true });
 telescopeRenderer.setSize(telescopeCanvas.clientWidth, telescopeCanvas.clientHeight, false);
-// OPTIMIZATION: Forced to 1. This prevents the PiP from calculating 4x the pixels on Retina mobile screens
 telescopeRenderer.setPixelRatio(1); 
 telescopeRenderer.outputEncoding = THREE.sRGBEncoding;
 
@@ -58,7 +57,6 @@ dirLight.shadow.camera.bottom = -30;
 dirLight.shadow.camera.near = 10;
 dirLight.shadow.camera.far = 150;
 dirLight.shadow.bias = -0.005;
-// OPTIMIZATION: Cut from 4096 to 2048. This frees up massive amounts of VRAM and prevents extreme loading times.
 dirLight.shadow.mapSize.width = 2048; 
 dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
@@ -100,7 +98,7 @@ const sunTex = safeLoad('assets/8k_sun.jpg', '#f59e0b');
 
 // --- STARFIELD ---
 const starsGeo = new THREE.BufferGeometry();
-const starCount = 1500; // Scaled down slightly to save memory
+const starCount = 1500; 
 const starPos = new Float32Array(starCount * 3);
 for (let i = 0; i < starCount * 3; i += 3) {
   const u = Math.random(); const v = Math.random();
@@ -238,27 +236,30 @@ moonOrbitPlane.add(new THREE.Line(ringGeo, ringMat));
 
 // --- 5. UMBRA & PENUMBRA CONES ---
 const shadowsGroup = new THREE.Group();
-// OPTIMIZATION: Render them instantly on load, then hide them. This stops the shader compiler from freezing the browser later!
 shadowsGroup.visible = true; 
 scene.add(shadowsGroup);
 
 function createCone(radiusTop, radiusBottom, height, colorHex, opacity) {
-  // OPTIMIZATION: Reduced polygon segments from 32 to 24 to ease GPU load
   const geo = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 24, 1, true);
   geo.translate(0, height / 2, 0); geo.rotateZ(Math.PI / 2); 
-  // OPTIMIZATION: Removed side: THREE.DoubleSide. This strictly prevents the browser from rendering the inside of the cone, saving 50% fill rate!
   const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: opacity, depthWrite: false });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.layers.disable(0); mesh.layers.enable(SHADOW_CONES_LAYER); 
   return mesh;
 }
 
-shadowsGroup.add(createCone(0, earthRadius, 55.0, 0x444400, 0.08)); 
-shadowsGroup.add(createCone(13.0, earthRadius, 55.0, 0x444400, 0.02)); 
-shadowsGroup.add(createCone(0, moonRadius, 28.0, 0x888888, 0.10)); 
-shadowsGroup.add(createCone(4.5, moonRadius, 28.0, 0x888888, 0.04)); 
+// FIXED: Assigned the cones back to their specific variables so they can be tracked in the animate loop!
+const earthUmbra = createCone(0, earthRadius, 55.0, 0x444400, 0.08); 
+const earthPenumbra = createCone(13.0, earthRadius, 55.0, 0x444400, 0.02); 
+const moonUmbra = createCone(0, moonRadius, 28.0, 0x888888, 0.10); 
+const moonPenumbra = createCone(4.5, moonRadius, 28.0, 0x888888, 0.04); 
 
-// Pre-compile trick: Render once, then hide.
+shadowsGroup.add(earthUmbra); 
+shadowsGroup.add(earthPenumbra); 
+shadowsGroup.add(moonUmbra); 
+shadowsGroup.add(moonPenumbra); 
+
+// Pre-compile trick
 renderer.compile(scene, camera);
 shadowsGroup.visible = false; 
 
@@ -333,7 +334,7 @@ function resizeTelescope() {
   const wrapper = document.getElementById('telescope-wrapper');
   const tWidth = wrapper.clientWidth;
   const tHeight = wrapper.clientHeight;
-  const pixelRatio = 1; // Locked strictly to 1 for mobile GPU safety
+  const pixelRatio = 1; 
   const expectedWidth = Math.floor(tWidth * pixelRatio);
   const expectedHeight = Math.floor(tHeight * pixelRatio);
 
@@ -429,24 +430,29 @@ function animate() {
   }
 
   if (shadowsGroup.visible) {
-    moonUmbra.position.copy(moonWorldPos); moonPenumbra.position.copy(moonWorldPos);
+    // This is where it crashed! Now that moonUmbra/moonPenumbra are safely assigned above, it runs perfectly.
+    moonUmbra.position.copy(moonWorldPos); 
+    moonPenumbra.position.copy(moonWorldPos);
   }
 
   if (activeCameraMode === 'tidal') {
-    let zoomScalar = window.innerWidth <= 768 ? 160 : 110;
+    let zoomScalar = window.innerWidth <= 768 ? 220 : 110;
     targetCamPos.set(0.1, zoomScalar, 0.1); 
     targetCtrlPos.set(0, 0, 0);
   } else if (activeCameraMode === 'earth') {
-    let zoomScalar = 7.3;
+    // FIXED: Pushed camera out drastically for mobile screens
+    let zoomScalar = window.innerWidth <= 768 ? 14.0 : 7.3;
     let dirToMoon = moonWorldPos.clone().normalize();
     targetCamPos.copy(dirToMoon.multiplyScalar(zoomScalar)); targetCtrlPos.copy(moonWorldPos);
   } else if (activeCameraMode === 'moon') {
-    let zoomScalar = window.innerWidth <= 768 ? 3.5 : 2.5;
+    // FIXED: Zoomed out enormously on mobile so it's beautifully framed!
+    let zoomScalar = window.innerWidth <= 768 ? 8.5 : 2.5;
     let dirToEarth = moonWorldPos.clone().negate().normalize();
     targetCamPos.copy(moonWorldPos).add(dirToEarth.multiplyScalar(zoomScalar)); targetCtrlPos.set(0, 0, 0);
   } else if (activeCameraMode === 'reset') {
-    let resetZ = window.innerWidth <= 768 ? 140 : 100;
-    let resetY = window.innerWidth <= 768 ? 80 : 50;
+    // FIXED: Initial loading and Reset zoom pushed way back for mobile.
+    let resetZ = window.innerWidth <= 768 ? 220 : 100;
+    let resetY = window.innerWidth <= 768 ? 140 : 50;
     targetCamPos.set(20, resetY, resetZ); targetCtrlPos.set(20, 0, 0);
   }
 
