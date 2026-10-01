@@ -3,82 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Lunar Orbit & Phase Lab</title>
+  <title>Lunar Orbit & Phase Lab</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
   <div id="top-bar">
     <h1 class="logo">Lunar Orbit Lab</h1>
-    <p class="subtitle">Earth-Moon Dynamics & Phase Simulation</p>
+    <p class="subtitle">Kinematics & Phase Simulation</p>
+  </div>
+
+  <div id="top-left-ui">
+    <div id="solar-modes" class="glass-panel">
+      <div class="mode-title">Eclipse Distance</div>
+      <div class="btn-group">
+        <button class="action-btn" id="btn-perigee">Perigee (Total)</button>
+        <button class="action-btn active" id="btn-apogee">Apogee (Annular)</button>
+      </div>
+    </div>
+
+    <div id="tidal-modes" class="glass-panel">
+      <div class="mode-title">Tidal Simulation</div>
+      <div class="btn-group">
+        <button class="action-btn active" id="btn-tidal-true">True Locked</button>
+        <button class="action-btn" id="btn-tidal-zero">Zero Rotation</button>
+      </div>
+    </div>
   </div>
 
   <div id="canvas-container"></div>
 
-  <div id="info-panel">
-    <div class="panel-header">View from Earth</div>
-    
-    <div id="telescope-wrapper">
-      <canvas id="telescope-canvas"></canvas>
-      <div class="reticle"></div>
-    </div>
+  <div id="info-panel" class="glass-panel">
+    <div class="panel-top-row">
+      <div id="telescope-wrapper">
+        <canvas id="telescope-canvas"></canvas>
+        <div class="reticle"></div>
+      </div>
 
-    <div class="phase-card">
-      <div id="phase-title">New Moon</div>
-      <div id="phase-illumination">Illumination: 0%</div>
-      <div id="phase-description">The unlit side faces Earth, making the Moon invisible in the night sky.</div>
+      <div class="phase-card">
+        <div id="phase-title">New Moon</div>
+        <div id="phase-illumination">0% Illumination</div>
+        <div id="phase-description">The unlit side faces Earth.</div>
+      </div>
     </div>
 
     <div class="quick-jump">
-      <label>Jump to Phase:</label>
-      <div class="btn-grid">
-        <button class="phase-btn">New</button>
-        <button class="phase-btn">Wax. Crescent</button>
-        <button class="phase-btn">1st Qtr</button>
-        <button class="phase-btn">Wax. Gibbous</button>
-        <button class="phase-btn">Full</button>
-        <button class="phase-btn">Wan. Gibbous</button>
-        <button class="phase-btn">3rd Qtr</button>
-        <button class="phase-btn">Wan. Crescent</button>
+      <div class="btn-grid phases">
+        <button class="action-btn phase-btn">New</button>
+        <button class="action-btn phase-btn">Wax. Crescent</button>
+        <button class="action-btn phase-btn">1st Qtr</button>
+        <button class="action-btn phase-btn">Wax. Gibbous</button>
+        <button class="action-btn phase-btn">Full</button>
+        <button class="action-btn phase-btn">Wan. Gibbous</button>
+        <button class="action-btn phase-btn">3rd Qtr</button>
+        <button class="action-btn phase-btn">Wan. Crescent</button>
       </div>
     </div>
 
     <div class="calendar-jump">
-      <div class="calendar-header">
-        <label>Exact Phase Date:</label>
-        <button class="action-btn" id="btn-live-date">Live Mode</button>
-      </div>
+      <button class="action-btn" id="btn-live-date">Live</button>
       <input type="date" id="calendar-picker">
     </div>
 
-    <div class="action-grid">
+    <button class="action-btn full-width" id="btn-tidal-toggle">Tidal Locking Simulation</button>
+
+    <div class="action-grid views">
       <button class="action-btn" id="btn-solar">Solar Ecl.</button>
       <button class="action-btn" id="btn-lunar">Lunar Ecl.</button>
-      <button class="action-btn" id="btn-earth-surf">Earth Sfc</button>
-      <button class="action-btn" id="btn-moon-surf">Moon Sfc</button>
-      <button class="action-btn" id="btn-shadows">Toggle Shadows</button>
+      <button class="action-btn" id="btn-earth-surf">Earth View</button>
+      <button class="action-btn" id="btn-moon-surf">Moon View</button>
+      <button class="action-btn full-width" id="btn-shadows">Toggle Shadows</button>
     </div>
 
     <div class="eclipse-control" id="eclipse-control-box">
-      <label>Eclipse Sweep:</label>
-      <input type="range" id="eclipse-slider" min="0" max="1" step="0.005" value="0.5">
+      <div class="btn-grid">
+        <button class="action-btn active" id="btn-ecl-total">Total</button>
+        <button class="action-btn" id="btn-ecl-partial">Partial</button>
+      </div>
     </div>
   </div>
 
-  <div id="control-bar">
-    <button id="play-pause-btn" class="ctrl-btn">Pause</button>
-    
+  <div id="control-bar" class="glass-panel">
+    <button id="play-pause-btn" class="ctrl-btn main">Pause</button>
     <div class="slider-group">
-      <label for="speed-slider">Speed:</label>
+      <label for="speed-slider">Speed</label>
       <input type="range" id="speed-slider" min="0.1" max="3.0" step="0.1" value="1.0">
     </div>
-
     <div class="slider-group">
-      <label for="phase-slider">Orbit:</label>
+      <label for="phase-slider">Orbit</label>
       <input type="range" id="phase-slider" min="0" max="6.283" step="0.01" value="0">
     </div>
-
-    <button id="reset-cam-btn" class="ctrl-btn secondary">Reset</button>
+    <button id="reset-cam-btn" class="ctrl-btn">Reset</button>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
