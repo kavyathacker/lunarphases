@@ -2,7 +2,7 @@
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 
-// FIXED: Initial load camera pulled way back for mobile browsers to fit the system
+// FIXED: Base FOV is initialized, but dynamically updated for Mobile Zoom Out
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
 const startZ = window.innerWidth <= 768 ? -220 : -120;
 camera.position.set(startZ, 25, 0);
@@ -248,7 +248,6 @@ function createCone(radiusTop, radiusBottom, height, colorHex, opacity) {
   return mesh;
 }
 
-// FIXED: Assigned the cones back to their specific variables so they can be tracked in the animate loop!
 const earthUmbra = createCone(0, earthRadius, 55.0, 0x444400, 0.08); 
 const earthPenumbra = createCone(13.0, earthRadius, 55.0, 0x444400, 0.02); 
 const moonUmbra = createCone(0, moonRadius, 28.0, 0x888888, 0.10); 
@@ -268,11 +267,20 @@ let isPlaying = true;
 let orbitSpeed = 1.0;
 let orbitalAnomaly = 0; 
 let activeCameraMode = 'free'; 
+let isCamLocked = false; // FIXED: Controls strict mathematical camera lock to prevent drag
 
 let eclipseMode = 'none'; 
 let eclipseSubMode = 'total'; 
 let solarDistanceMode = 'apogee'; 
 let tidalMode = 'none'; 
+
+// FIXED: Clean Camera Switching Function
+function setCameraMode(mode) {
+  if (activeCameraMode !== mode) {
+    activeCameraMode = mode;
+    isCamLocked = false; // Always allow the smooth transition before locking again
+  }
+}
 
 const MAX_ORBIT_TILT = 5.14 * Math.PI / 180;
 const LUNAR_AXIAL_TILT = 6.68 * Math.PI / 180; 
@@ -321,8 +329,12 @@ function updatePhaseInfo() {
 }
 
 function updateCameraOffset() {
-  const isBottomPanel = window.innerWidth <= 768;
-  if (isBottomPanel) { 
+  const isMobile = window.innerWidth <= 768;
+  
+  // FIXED: Expands Field of View strictly on Mobile to instantly zoom everything VERY out!
+  camera.fov = isMobile ? 85 : 45; 
+  
+  if (isMobile) { 
     camera.setViewOffset(window.innerWidth, window.innerHeight, 0, window.innerHeight * 0.10, window.innerWidth, window.innerHeight); 
   } else { 
     camera.setViewOffset(window.innerWidth, window.innerHeight, 115, 0, window.innerWidth, window.innerHeight); 
@@ -430,45 +442,52 @@ function animate() {
   }
 
   if (shadowsGroup.visible) {
-    // This is where it crashed! Now that moonUmbra/moonPenumbra are safely assigned above, it runs perfectly.
     moonUmbra.position.copy(moonWorldPos); 
     moonPenumbra.position.copy(moonWorldPos);
   }
 
+  // FIXED: Camera physical targets optimized to compliment the new ultra-wide Mobile FOV!
   if (activeCameraMode === 'tidal') {
     let zoomScalar = window.innerWidth <= 768 ? 220 : 110;
     targetCamPos.set(0.1, zoomScalar, 0.1); 
     targetCtrlPos.set(0, 0, 0);
   } else if (activeCameraMode === 'earth') {
-    // FIXED: Pushed camera out drastically for mobile screens
-    let zoomScalar = window.innerWidth <= 768 ? 14.0 : 7.3;
+    let zoomScalar = window.innerWidth <= 768 ? 10.0 : 7.3;
     let dirToMoon = moonWorldPos.clone().normalize();
     targetCamPos.copy(dirToMoon.multiplyScalar(zoomScalar)); targetCtrlPos.copy(moonWorldPos);
   } else if (activeCameraMode === 'moon') {
-    // FIXED: Zoomed out enormously on mobile so it's beautifully framed!
-    let zoomScalar = window.innerWidth <= 768 ? 8.5 : 2.5;
+    let zoomScalar = window.innerWidth <= 768 ? 6.5 : 2.5;
     let dirToEarth = moonWorldPos.clone().negate().normalize();
     targetCamPos.copy(moonWorldPos).add(dirToEarth.multiplyScalar(zoomScalar)); targetCtrlPos.set(0, 0, 0);
   } else if (activeCameraMode === 'reset') {
-    // FIXED: Initial loading and Reset zoom pushed way back for mobile.
-    let resetZ = window.innerWidth <= 768 ? 220 : 100;
-    let resetY = window.innerWidth <= 768 ? 140 : 50;
+    let resetZ = window.innerWidth <= 768 ? 200 : 100;
+    let resetY = window.innerWidth <= 768 ? 120 : 50;
     targetCamPos.set(20, resetY, resetZ); targetCtrlPos.set(20, 0, 0);
   }
 
   if (activeCameraMode !== 'free') {
     let camDist = camera.position.distanceTo(targetCamPos);
     let ctrlDist = controls.target.distanceTo(targetCtrlPos);
-    if (camDist < 2.0 && ctrlDist < 2.0) {
-      camera.position.copy(targetCamPos); controls.target.copy(targetCtrlPos);
+    
+    // FIXED: The Absolute Lock! Once the camera glides close enough to the target,
+    // it perfectly forces 0 lag and 0 dragging regardless of how fast the orbit is moving.
+    if (camDist < 0.5 && ctrlDist < 0.5) {
+      isCamLocked = true;
+    }
+
+    if (isCamLocked) {
+      camera.position.copy(targetCamPos); 
+      controls.target.copy(targetCtrlPos);
       if (activeCameraMode === 'reset' || activeCameraMode === 'tidal') {
-        activeCameraMode = 'free'; 
+        setCameraMode('free'); 
       }
     } else {
-      camera.position.lerp(targetCamPos, 0.08); controls.target.lerp(targetCtrlPos, 0.08);
+      camera.position.lerp(targetCamPos, 0.08); 
+      controls.target.lerp(targetCtrlPos, 0.08);
     }
     camera.lookAt(controls.target);
   } else {
+    isCamLocked = false;
     controls.update();
   }
 
@@ -497,7 +516,7 @@ function toggleEclipse(mode) {
   } else {
     clearEclipseModes(); eclipseMode = mode; document.getElementById(`btn-${mode}`).classList.add('active');
     orbitPivot.rotation.y = 0; isPlaying = false; playBtn.innerText = "Play";
-    if (activeCameraMode !== 'tidal') activeCameraMode = 'earth'; 
+    if (activeCameraMode !== 'tidal') setCameraMode('earth'); 
     document.getElementById('eclipse-control-box').classList.add('active');
     if (mode === 'solar') document.getElementById('solar-modes').classList.add('active');
   }
@@ -509,7 +528,7 @@ document.getElementById('btn-tidal-toggle').addEventListener('click', () => {
   const btn = document.getElementById('btn-tidal-toggle');
   if (tidalMode === 'none') {
     tidalMode = 'locked';
-    activeCameraMode = 'tidal';
+    setCameraMode('tidal');
     tidalArrowGroup.visible = true;
     btn.classList.add('active');
     document.getElementById('tidal-modes').classList.add('active');
@@ -517,7 +536,7 @@ document.getElementById('btn-tidal-toggle').addEventListener('click', () => {
     document.getElementById('btn-tidal-zero').classList.remove('active');
   } else {
     tidalMode = 'none';
-    activeCameraMode = 'reset';
+    setCameraMode('reset');
     tidalArrowGroup.visible = false;
     btn.classList.remove('active');
     document.getElementById('tidal-modes').classList.remove('active');
@@ -549,8 +568,8 @@ document.getElementById('phase-slider').addEventListener('input', (e) => { orbit
 
 document.getElementById('btn-solar').addEventListener('click', () => toggleEclipse('solar'));
 document.getElementById('btn-lunar').addEventListener('click', () => toggleEclipse('lunar'));
-document.getElementById('btn-earth-surf').addEventListener('click', () => { activeCameraMode = 'earth'; });
-document.getElementById('btn-moon-surf').addEventListener('click', () => { activeCameraMode = 'moon'; });
+document.getElementById('btn-earth-surf').addEventListener('click', () => { setCameraMode('earth'); });
+document.getElementById('btn-moon-surf').addEventListener('click', () => { setCameraMode('moon'); });
 document.getElementById('btn-shadows').addEventListener('click', () => { shadowsGroup.visible = !shadowsGroup.visible; document.getElementById('btn-shadows').classList.toggle('active', shadowsGroup.visible); });
 
 document.getElementById('btn-live-date').addEventListener('click', () => { document.getElementById('calendar-picker').value = ''; isPlaying = true; playBtn.innerText = "Pause"; clearEclipseModes(); updatePhaseInfo(); });
@@ -575,8 +594,8 @@ document.getElementById('calendar-picker').addEventListener('change', (e) => {
   isPlaying = false; playBtn.innerText = "Play"; clearEclipseModes(); updatePhaseInfo();
 });
 
-document.getElementById('reset-cam-btn').addEventListener('click', () => { activeCameraMode = 'reset'; });
-controls.addEventListener('start', () => { if (activeCameraMode !== 'free' && activeCameraMode !== 'reset' && activeCameraMode !== 'tidal') activeCameraMode = 'free'; });
+document.getElementById('reset-cam-btn').addEventListener('click', () => { setCameraMode('reset'); });
+controls.addEventListener('start', () => { if (activeCameraMode !== 'free' && activeCameraMode !== 'reset' && activeCameraMode !== 'tidal') setCameraMode('free'); });
 
 window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; updateCameraOffset(); renderer.setSize(window.innerWidth, window.innerHeight); resizeTelescope(); });
 updateCameraOffset(); resizeTelescope(); animate();
