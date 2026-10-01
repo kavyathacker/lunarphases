@@ -29,16 +29,21 @@ telescopeRenderer.outputEncoding = THREE.sRGBEncoding;
 
 const telescopeCamera = new THREE.PerspectiveCamera(24, telescopeCanvas.clientWidth / telescopeCanvas.clientHeight, 1.0, 500);
 
-// --- STRICT CAMERA LAYERS ---
+// --- STRICT CAMERA LAYERS (FIX FOR TIDAL ARROW) ---
 const SUN_LAYER = 1;
 const SHADOW_CONES_LAYER = 2; 
+const TIDAL_ARROW_LAYER = 4; // NEW: Dedicated layer for the physics arrow
 
+// The Telescope Camera strictly looks at Layer 0 (the Moon & Earth). It completely ignores Layer 4!
 telescopeCamera.layers.set(0); 
+
+// The Main user camera is permitted to see all environmental layers, including the Arrow.
 camera.layers.enable(SUN_LAYER);
 camera.layers.enable(SHADOW_CONES_LAYER); 
+camera.layers.enable(TIDAL_ARROW_LAYER); 
 
 // --- LIGHTING ---
-const sunPosition = new THREE.Vector3(180, 0, 0);
+const sunPosition = new THREE.Vector3(75, 0, 0);
 
 const sunLight = new THREE.PointLight(0xffffff, 1.0, 1800);
 sunLight.position.copy(sunPosition);
@@ -51,8 +56,8 @@ dirLight.shadow.camera.left = -30;
 dirLight.shadow.camera.right = 30;
 dirLight.shadow.camera.top = 30;
 dirLight.shadow.camera.bottom = -30;
-dirLight.shadow.camera.near = 100;
-dirLight.shadow.camera.far = 250;
+dirLight.shadow.camera.near = 10;
+dirLight.shadow.camera.far = 150;
 dirLight.shadow.bias = -0.005;
 dirLight.shadow.mapSize.width = 4096;
 dirLight.shadow.mapSize.height = 4096;
@@ -61,7 +66,7 @@ scene.add(dirLight);
 const ambientLight = new THREE.AmbientLight(0x111111, 0.2);
 scene.add(ambientLight);
 
-const bloodLight = new THREE.SpotLight(0xff2200, 0, 50, 0.4, 1.0);
+const bloodLight = new THREE.SpotLight(0xff2200, 0, 65, 0.5, 1.0);
 bloodLight.position.set(0, 0, 0); 
 bloodLight.castShadow = false; 
 scene.add(bloodLight);
@@ -110,19 +115,16 @@ const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, transpar
 scene.add(new THREE.Points(starsGeo, starsMat));
 
 // --- 1. THE SUN ---
-const sunGeo = new THREE.SphereGeometry(16, 64, 64);
+const sunGeo = new THREE.SphereGeometry(12.7, 64, 64);
 const sunMat = new THREE.MeshBasicMaterial({ map: sunTex });
 const sun = new THREE.Mesh(sunGeo, sunMat);
 sun.position.copy(sunPosition);
 sun.layers.set(SUN_LAYER); 
 scene.add(sun);
 
-// --- 2. THE EARTH (PERFECTED SINGLE-SPHERE SHADER) ---
-const earthRadius = 5.2;
+// --- 2. THE EARTH ---
+const earthRadius = 7.2;
 
-// CRITICAL FIX: The multi-sphere hack is completely dead. The Earth is now EXACTLY ONE physical sphere. 
-// It natively catches standard shadows, and seamlessly illuminates the night side using a custom PBR Emissive Mask!
-// Z-fighting and texture tearing are permanently eliminated.
 const earthMat = new THREE.MeshStandardMaterial({
   map: earthDayTex,
   emissiveMap: earthNightTex,
@@ -133,37 +135,22 @@ const earthMat = new THREE.MeshStandardMaterial({
 
 earthMat.onBeforeCompile = function (shader) {
   shader.uniforms.sunPos = { value: sunPosition };
-
-  shader.vertexShader = `
-    varying vec3 vEarthWorldNormal;
-    ${shader.vertexShader}
-  `.replace(
-    '#include <worldpos_vertex>',
-    `
-    #include <worldpos_vertex>
-    vEarthWorldNormal = normalize(mat3(modelMatrix) * normal);
-    `
+  shader.vertexShader = shader.vertexShader.replace(
+    '#include <common>', '#include <common>\nvarying vec3 vWorldNormalEarth;\n'
+  ).replace(
+    '#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWorldNormalEarth = normalize((modelMatrix * vec4(normal, 0.0)).xyz);\n'
   );
-
-  shader.fragmentShader = `
-    uniform vec3 sunPos;
-    varying vec3 vEarthWorldNormal;
-    ${shader.fragmentShader}
-  `.replace(
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <common>', '#include <common>\nuniform vec3 sunPos;\nvarying vec3 vWorldNormalEarth;\n'
+  ).replace(
     '#include <emissivemap_fragment>',
     `
     #ifdef USE_EMISSIVEMAP
       vec4 emissiveColor = texture2D( emissiveMap, vUv );
       emissiveColor.rgb = emissiveMapTexelToLinear( emissiveColor ).rgb;
-      
-      // Calculate where the sun is hitting
       vec3 sunDir = normalize(sunPos);
-      float sunDot = dot(vEarthWorldNormal, sunDir);
-      
-      // Smoothly fade in the city lights exactly as the sun dot drops below the horizon
+      float sunDot = dot(vWorldNormalEarth, sunDir);
       float nightBlend = smoothstep(0.15, -0.15, sunDot);
-
-      // Mask the emissive map so city lights ONLY show up on the dark side of the globe
       totalEmissiveRadiance *= (emissiveColor.rgb * nightBlend);
     #endif
     `
@@ -172,7 +159,23 @@ earthMat.onBeforeCompile = function (shader) {
 
 const earth = new THREE.Mesh(new THREE.SphereGeometry(earthRadius, 64, 64), earthMat);
 earth.receiveShadow = true; 
+earth.rotation.y = 1.5; 
 scene.add(earth);
+
+const shadowMat = new THREE.ShadowMaterial({ opacity: 0.85, transparent: true, depthWrite: false });
+shadowMat.onBeforeCompile = function ( shader ) {
+  shader.uniforms.sunPos = { value: sunPosition };
+  shader.vertexShader = `varying vec3 vWorldPos;\n${shader.vertexShader}`.replace(
+    '#include <project_vertex>', `#include <project_vertex>\nvWorldPos = (modelMatrix * vec4( position, 1.0 )).xyz;\n`
+  );
+  shader.fragmentShader = `uniform vec3 sunPos;\nvarying vec3 vWorldPos;\n${shader.fragmentShader}`.replace(
+    'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
+    `vec3 toSun = normalize(sunPos - vWorldPos); vec3 sphereNormal = normalize(vWorldPos); float sunDot = dot(sphereNormal, toSun); float daySide = smoothstep(0.0, 0.15, sunDot); gl_FragColor = vec4( color, opacity * daySide * ( 1.0 - getShadowMask() ) );`
+  );
+};
+const earthShadowCatcher = new THREE.Mesh(new THREE.SphereGeometry(earthRadius + 0.005, 64, 64), shadowMat);
+earthShadowCatcher.receiveShadow = true;
+earth.add(earthShadowCatcher);
 
 // --- 3. ORBIT HIERARCHY ---
 const orbitPivot = new THREE.Group();
@@ -181,30 +184,58 @@ scene.add(orbitPivot);
 const moonOrbitPlane = new THREE.Group();
 orbitPivot.add(moonOrbitPlane);
 
-// --- 4. THE MOON ---
-const moonRadius = 1.70;
-const moonGeo = new THREE.SphereGeometry(moonRadius, 64, 64);
-moonGeo.rotateY(-Math.PI / 2);
+const moonWrapper = new THREE.Group();
+moonOrbitPlane.add(moonWrapper);
 
-const moonMat = new THREE.MeshStandardMaterial({
-  map: moonTex,
-  roughness: 1.0,
-  metalness: 0.0,
-  emissive: 0x000000, 
-  emissiveIntensity: 0
-});
+// --- 4. THE MOON & TIDAL ARROW ---
+const moonRadius = 2.7;
+const moonGeo = new THREE.SphereGeometry(moonRadius, 64, 64);
+moonGeo.rotateY(-Math.PI / 2); 
+
+const moonMat = new THREE.MeshStandardMaterial({ map: moonTex, roughness: 1.0, metalness: 0.0, emissive: 0x000000, emissiveIntensity: 0 });
 const moon = new THREE.Mesh(moonGeo, moonMat);
 moon.castShadow = true;
 moon.receiveShadow = true;
-moonOrbitPlane.add(moon);
+moon.rotation.order = 'YXZ'; 
+moonWrapper.add(moon);
+
+// A clean, elegant minimal blue arrow representing the Tidal axis
+const tidalArrowGroup = new THREE.Group();
+const shaftMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 }); 
+const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 5), shaftMat);
+shaft.rotateX(Math.PI / 2); 
+shaft.position.set(0, 0, -moonRadius - 2.5);
+
+const head = new THREE.Mesh(new THREE.ConeGeometry(1.0, 2.5, 16), shaftMat);
+head.rotateX(-Math.PI / 2);
+head.position.set(0, 0, -moonRadius - 6.2);
+
+// FIXED: Opts the arrow parts exclusively into Layer 4. The Telescope camera cannot see them!
+shaft.layers.set(TIDAL_ARROW_LAYER);
+head.layers.set(TIDAL_ARROW_LAYER);
+
+tidalArrowGroup.add(shaft);
+tidalArrowGroup.add(head);
+tidalArrowGroup.visible = false; 
+moon.add(tidalArrowGroup);
+
+// --- TRUE KEPLERIAN ELLIPSE ---
+const ORBIT_A = 21.0; 
+const ECCENTRICITY = 0.0549; 
 
 const ringPoints = [];
 for (let i = 0; i <= 128; i++) {
-  const theta = (i / 128) * Math.PI * 2;
-  ringPoints.push(new THREE.Vector3(20 * Math.cos(theta), 0, -20 * Math.sin(theta)));
+  let M_i = (i / 128) * Math.PI * 2;
+  let E_i = M_i;
+  for (let j = 0; j < 5; j++) E_i = M_i + ECCENTRICITY * Math.sin(E_i);
+  let x_i = Math.cos(E_i) - ECCENTRICITY;
+  let y_i = Math.sqrt(1 - ECCENTRICITY * ECCENTRICITY) * Math.sin(E_i);
+  let nu_i = Math.atan2(y_i, x_i);
+  let r_i = ORBIT_A * (1 - ECCENTRICITY * Math.cos(E_i));
+  ringPoints.push(new THREE.Vector3(r_i * Math.cos(nu_i), 0, -r_i * Math.sin(nu_i)));
 }
 const ringGeo = new THREE.BufferGeometry().setFromPoints(ringPoints);
-const ringMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.22 });
+const ringMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.22 });
 moonOrbitPlane.add(new THREE.Line(ringGeo, ringMat));
 
 // --- 5. UMBRA & PENUMBRA CONES ---
@@ -217,28 +248,28 @@ function createCone(radiusTop, radiusBottom, height, colorHex, opacity) {
   geo.translate(0, height / 2, 0); geo.rotateZ(Math.PI / 2); 
   const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: opacity, side: THREE.DoubleSide, depthWrite: false });
   const mesh = new THREE.Mesh(geo, mat);
-  
-  mesh.layers.disable(0); 
-  mesh.layers.enable(SHADOW_CONES_LAYER); 
+  mesh.layers.disable(0); mesh.layers.enable(SHADOW_CONES_LAYER); 
   return mesh;
 }
 
-const earthUmbra = createCone(0, earthRadius, 86.6, 0x444400, 0.08); 
-const earthPenumbra = createCone(15.4, earthRadius, 86.6, 0x444400, 0.02); 
-shadowsGroup.add(earthUmbra); shadowsGroup.add(earthPenumbra);
-
-const moonUmbra = createCone(0, moonRadius, 19.0, 0x888888, 0.10); 
-const moonPenumbra = createCone(4.0, moonRadius, 19.0, 0x888888, 0.04); 
-shadowsGroup.add(moonUmbra); shadowsGroup.add(moonPenumbra);
+shadowsGroup.add(createCone(0, earthRadius, 55.0, 0x444400, 0.08)); 
+shadowsGroup.add(createCone(13.0, earthRadius, 55.0, 0x444400, 0.02)); 
+shadowsGroup.add(createCone(0, moonRadius, 28.0, 0x888888, 0.10)); 
+shadowsGroup.add(createCone(4.5, moonRadius, 28.0, 0x888888, 0.04)); 
 
 // --- SIMULATION DYNAMICS ---
 let isPlaying = true;
 let orbitSpeed = 1.0;
 let orbitalAnomaly = 0; 
 let activeCameraMode = 'free'; 
+
 let eclipseMode = 'none'; 
+let eclipseSubMode = 'total'; 
+let solarDistanceMode = 'apogee'; 
+let tidalMode = 'none'; 
 
 const MAX_ORBIT_TILT = 5.14 * Math.PI / 180;
+const LUNAR_AXIAL_TILT = 6.68 * Math.PI / 180; 
 
 const phases = [
   { name: "New Moon", min: 6.13, max: 0.15, illumRange: "0%", desc: "The unlit side faces Earth, making the Moon invisible in the night sky." },
@@ -269,7 +300,7 @@ function updatePhaseInfo() {
   else { for (let p of phases) { if (phaseAngle >= p.min && phaseAngle < p.max) { activePhase = p; break; } } }
   
   const newTitle = activePhase.name;
-  const newIllum = isPlaying ? `Illumination: ${exactIllum}%` : `Illumination: ${activePhase.illumRange}`;
+  const newIllum = isPlaying ? `${exactIllum}% Illumination` : `${activePhase.illumRange} Illumination`;
   
   if (lastPhaseName !== newTitle) {
     document.getElementById('phase-title').innerText = newTitle;
@@ -288,8 +319,7 @@ function updateCameraOffset() {
   if (isBottomPanel) { 
     camera.setViewOffset(window.innerWidth, window.innerHeight, 0, window.innerHeight * 0.10, window.innerWidth, window.innerHeight); 
   } else { 
-    // Shift reduced to 145px to perfectly balance the newly refined Desktop Site Box width
-    camera.setViewOffset(window.innerWidth, window.innerHeight, 145, 0, window.innerWidth, window.innerHeight); 
+    camera.setViewOffset(window.innerWidth, window.innerHeight, 115, 0, window.innerWidth, window.innerHeight); 
   }
   camera.updateProjectionMatrix();
 }
@@ -298,7 +328,6 @@ function resizeTelescope() {
   const wrapper = document.getElementById('telescope-wrapper');
   const tWidth = wrapper.clientWidth;
   const tHeight = wrapper.clientHeight;
-  
   const pixelRatio = window.devicePixelRatio || 1;
   const expectedWidth = Math.floor(tWidth * pixelRatio);
   const expectedHeight = Math.floor(tHeight * pixelRatio);
@@ -318,41 +347,76 @@ function animate() {
   const delta = clock.getDelta();
 
   if (isPlaying) {
-    orbitalAnomaly += delta * 0.35 * orbitSpeed;
+    orbitalAnomaly += delta * 0.85 * orbitSpeed;
     if (orbitalAnomaly > Math.PI * 2) orbitalAnomaly -= Math.PI * 2;
-    earth.rotation.y += delta * 0.22 * orbitSpeed;
-    sun.rotation.y += delta * 0.03;
-    orbitPivot.rotation.y += delta * 0.05 * orbitSpeed;
+    earth.rotation.y += delta * 0.55 * orbitSpeed;
+    sun.rotation.y += delta * 0.07;
   }
 
   if (eclipseMode === 'solar' || eclipseMode === 'lunar') {
-    moonOrbitPlane.rotation.z = 0; moonOrbitPlane.rotation.x = MAX_ORBIT_TILT; 
+    moonOrbitPlane.rotation.x = 0; moonOrbitPlane.rotation.z = 0;
   } else {
     moonOrbitPlane.rotation.z = MAX_ORBIT_TILT; moonOrbitPlane.rotation.x = 0; 
   }
 
-  let v = parseFloat(document.getElementById('eclipse-slider').value);
-  let sweep = (v - 0.5) * 0.7; 
+  let M = orbitalAnomaly; 
+  let sweep = 0;
+
+  if (eclipseMode !== 'none') {
+    if (eclipseSubMode === 'partial') sweep = Math.sin(clock.getElapsedTime()) * 0.35; 
+
+    if (eclipseMode === 'solar') {
+      if (solarDistanceMode === 'perigee') {
+        M = 0 - sweep; moonOrbitPlane.rotation.y = 0;
+      } else {
+        M = Math.PI + sweep; moonOrbitPlane.rotation.y = Math.PI; 
+      }
+    } else if (eclipseMode === 'lunar') {
+      M = Math.PI + sweep; moonOrbitPlane.rotation.y = 0;
+    }
+  } else {
+    moonOrbitPlane.rotation.y = 0;
+  }
+
+  let E = M;
+  for (let i = 0; i < 5; i++) E = M + ECCENTRICITY * Math.sin(E);
   
-  if (eclipseMode === 'solar') { orbitalAnomaly = 0 - sweep; } 
-  else if (eclipseMode === 'lunar') { orbitalAnomaly = Math.PI + sweep; }
+  let x = Math.cos(E) - ECCENTRICITY;
+  let y = Math.sqrt(1 - ECCENTRICITY * ECCENTRICITY) * Math.sin(E);
+  let nu = Math.atan2(y, x);
+  if (nu < 0) nu += Math.PI * 2;
+  let r = ORBIT_A * (1 - ECCENTRICITY * Math.cos(E));
 
-  moon.position.x = 20 * Math.cos(orbitalAnomaly);
-  moon.position.z = -20 * Math.sin(orbitalAnomaly);
-  moon.lookAt(earth.position);
-  moon.getWorldPosition(moonWorldPos);
+  moonWrapper.position.x = r * Math.cos(nu);
+  moonWrapper.position.z = -r * Math.sin(nu);
+  moonWrapper.lookAt(earth.position);
+  
+  let normM = M % (Math.PI * 2);
+  if (normM < 0) normM += Math.PI * 2;
+  let diff = normM - nu;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
 
-  let physicalDist = Math.abs(sweep);
+  // TIDAL LOCKING MATH
+  if (tidalMode === 'zero') {
+    moon.rotation.set(0, -nu, 0);
+  } else {
+    let librationLon = diff * 2.5; 
+    let librationLat = (LUNAR_AXIAL_TILT * Math.sin(nu)) * 2.5;
+    moon.rotation.set(librationLat, librationLon, 0);
+  }
+
+  moonWrapper.getWorldPosition(moonWorldPos);
+  let physicalDist = (eclipseMode !== 'none') ? Math.abs(sweep) : 0;
   earth.castShadow = (eclipseMode === 'lunar');
 
-  // --- PERFECTED PHYSICAL LIGHTING ---
   if (eclipseMode === 'solar') {
-    let blackout = Math.max(0, 1.0 - (physicalDist / 0.05)); 
+    let blackout = Math.max(0, 1.0 - (physicalDist / 0.12)); 
     ambientLight.intensity = 0.2 - (blackout * 0.18); 
     bloodLight.intensity = 0;
   } else if (eclipseMode === 'lunar') {
     ambientLight.intensity = 0.2; 
-    let redIntensity = Math.max(0, 1.0 - (physicalDist / 0.28)) * 3.0; 
+    let redIntensity = Math.max(0, 1.0 - (physicalDist / 0.35)) * 3.0; 
     bloodLight.intensity = redIntensity; 
     bloodLight.target.position.copy(moonWorldPos);
   } else {
@@ -361,38 +425,38 @@ function animate() {
   }
 
   if (shadowsGroup.visible) {
-    moonUmbra.position.copy(moonWorldPos);
-    moonPenumbra.position.copy(moonWorldPos);
+    moonUmbra.position.copy(moonWorldPos); moonPenumbra.position.copy(moonWorldPos);
   }
 
-  if (activeCameraMode === 'earth') {
-    let zoomScalar = window.innerWidth <= 768 ? 7.5 : 5.5;
-    let dirToMoon = moonWorldPos.clone().normalize();
-    targetCamPos.copy(dirToMoon.multiplyScalar(zoomScalar)); 
-    targetCtrlPos.copy(moonWorldPos);
-  } else if (activeCameraMode === 'moon') {
-    let zoomScalar = window.innerWidth <= 768 ? 2.8 : 1.9;
-    let dirToEarth = moonWorldPos.clone().negate().normalize();
-    targetCamPos.copy(moonWorldPos).add(dirToEarth.multiplyScalar(zoomScalar)); 
+  // --- FREEDOM CAMERA LOGIC ---
+  if (activeCameraMode === 'tidal') {
+    let zoomScalar = window.innerWidth <= 768 ? 160 : 110;
+    targetCamPos.set(0.1, zoomScalar, 0.1); 
     targetCtrlPos.set(0, 0, 0);
+  } else if (activeCameraMode === 'earth') {
+    let zoomScalar = 7.3;
+    let dirToMoon = moonWorldPos.clone().normalize();
+    targetCamPos.copy(dirToMoon.multiplyScalar(zoomScalar)); targetCtrlPos.copy(moonWorldPos);
+  } else if (activeCameraMode === 'moon') {
+    let zoomScalar = window.innerWidth <= 768 ? 3.5 : 2.5;
+    let dirToEarth = moonWorldPos.clone().negate().normalize();
+    targetCamPos.copy(moonWorldPos).add(dirToEarth.multiplyScalar(zoomScalar)); targetCtrlPos.set(0, 0, 0);
   } else if (activeCameraMode === 'reset') {
-    let resetZ = window.innerWidth <= 768 ? -150 : -120;
-    targetCamPos.set(resetZ, 25, 0); targetCtrlPos.set(0, 0, 0);
+    let resetZ = window.innerWidth <= 768 ? 140 : 100;
+    let resetY = window.innerWidth <= 768 ? 80 : 50;
+    targetCamPos.set(20, resetY, resetZ); targetCtrlPos.set(20, 0, 0);
   }
 
   if (activeCameraMode !== 'free') {
     let camDist = camera.position.distanceTo(targetCamPos);
     let ctrlDist = controls.target.distanceTo(targetCtrlPos);
-    
     if (camDist < 2.0 && ctrlDist < 2.0) {
-      camera.position.copy(targetCamPos);
-      controls.target.copy(targetCtrlPos);
-      if (activeCameraMode === 'reset') {
+      camera.position.copy(targetCamPos); controls.target.copy(targetCtrlPos);
+      if (activeCameraMode === 'reset' || activeCameraMode === 'tidal') {
         activeCameraMode = 'free'; 
       }
     } else {
-      camera.position.lerp(targetCamPos, 0.08);
-      controls.target.lerp(targetCtrlPos, 0.08);
+      camera.position.lerp(targetCamPos, 0.08); controls.target.lerp(targetCtrlPos, 0.08);
     }
     camera.lookAt(controls.target);
   } else {
@@ -401,12 +465,11 @@ function animate() {
 
   updatePhaseInfo();
   renderer.render(scene, camera);
+  resizeTelescope(); 
 
   const dirToMoon = moonWorldPos.clone().sub(earth.position).normalize();
-  telescopeCamera.position.copy(earth.position).add(dirToMoon.multiplyScalar(5.3));
-  telescopeCamera.up.set(0, 1, 0); 
-  telescopeCamera.lookAt(moonWorldPos);
-
+  telescopeCamera.position.copy(earth.position).add(dirToMoon.multiplyScalar(7.4));
+  telescopeCamera.up.set(0, 1, 0); telescopeCamera.lookAt(moonWorldPos);
   telescopeRenderer.render(scene, telescopeCamera);
 }
 
@@ -415,6 +478,8 @@ function clearEclipseModes() {
   eclipseMode = 'none';
   document.getElementById('btn-solar').classList.remove('active');
   document.getElementById('btn-lunar').classList.remove('active');
+  document.getElementById('eclipse-control-box').classList.remove('active');
+  document.getElementById('solar-modes').classList.remove('active');
 }
 
 function toggleEclipse(mode) {
@@ -423,18 +488,53 @@ function toggleEclipse(mode) {
   } else {
     clearEclipseModes(); eclipseMode = mode; document.getElementById(`btn-${mode}`).classList.add('active');
     orbitPivot.rotation.y = 0; isPlaying = false; playBtn.innerText = "Play";
-    activeCameraMode = 'earth'; document.getElementById('eclipse-slider').value = 0.5; 
+    if (activeCameraMode !== 'tidal') activeCameraMode = 'earth'; 
+    document.getElementById('eclipse-control-box').classList.add('active');
+    if (mode === 'solar') document.getElementById('solar-modes').classList.add('active');
   }
   updatePhaseInfo();
 }
 
-// --- EVENT LISTENERS ---
-const playBtn = document.getElementById('play-pause-btn');
-playBtn.addEventListener('click', () => {
-  isPlaying = !isPlaying; playBtn.innerText = isPlaying ? "Pause" : "Play";
-  if (isPlaying) clearEclipseModes(); updatePhaseInfo();
+// --- TIDAL UI EVENT LISTENERS ---
+document.getElementById('btn-tidal-toggle').addEventListener('click', () => {
+  const btn = document.getElementById('btn-tidal-toggle');
+  if (tidalMode === 'none') {
+    tidalMode = 'locked';
+    activeCameraMode = 'tidal';
+    tidalArrowGroup.visible = true;
+    btn.classList.add('active');
+    document.getElementById('tidal-modes').classList.add('active');
+    document.getElementById('btn-tidal-true').classList.add('active');
+    document.getElementById('btn-tidal-zero').classList.remove('active');
+  } else {
+    tidalMode = 'none';
+    activeCameraMode = 'reset';
+    tidalArrowGroup.visible = false;
+    btn.classList.remove('active');
+    document.getElementById('tidal-modes').classList.remove('active');
+  }
 });
 
+document.getElementById('btn-tidal-true').addEventListener('click', () => {
+  tidalMode = 'locked';
+  document.getElementById('btn-tidal-true').classList.add('active');
+  document.getElementById('btn-tidal-zero').classList.remove('active');
+});
+
+document.getElementById('btn-tidal-zero').addEventListener('click', () => {
+  tidalMode = 'zero';
+  document.getElementById('btn-tidal-zero').classList.add('active');
+  document.getElementById('btn-tidal-true').classList.remove('active');
+});
+
+// --- EXISTING EVENT LISTENERS ---
+document.getElementById('btn-ecl-total').addEventListener('click', () => { eclipseSubMode = 'total'; document.getElementById('btn-ecl-total').classList.add('active'); document.getElementById('btn-ecl-partial').classList.remove('active'); });
+document.getElementById('btn-ecl-partial').addEventListener('click', () => { eclipseSubMode = 'partial'; document.getElementById('btn-ecl-partial').classList.add('active'); document.getElementById('btn-ecl-total').classList.remove('active'); });
+document.getElementById('btn-perigee').addEventListener('click', () => { solarDistanceMode = 'perigee'; document.getElementById('btn-perigee').classList.add('active'); document.getElementById('btn-apogee').classList.remove('active'); });
+document.getElementById('btn-apogee').addEventListener('click', () => { solarDistanceMode = 'apogee'; document.getElementById('btn-apogee').classList.add('active'); document.getElementById('btn-perigee').classList.remove('active'); });
+
+const playBtn = document.getElementById('play-pause-btn');
+playBtn.addEventListener('click', () => { isPlaying = !isPlaying; playBtn.innerText = isPlaying ? "Pause" : "Play"; if (isPlaying) clearEclipseModes(); updatePhaseInfo(); });
 document.getElementById('speed-slider').addEventListener('input', (e) => { orbitSpeed = parseFloat(e.target.value); });
 document.getElementById('phase-slider').addEventListener('input', (e) => { orbitalAnomaly = parseFloat(e.target.value); updatePhaseInfo(); });
 
@@ -442,24 +542,15 @@ document.getElementById('btn-solar').addEventListener('click', () => toggleEclip
 document.getElementById('btn-lunar').addEventListener('click', () => toggleEclipse('lunar'));
 document.getElementById('btn-earth-surf').addEventListener('click', () => { activeCameraMode = 'earth'; });
 document.getElementById('btn-moon-surf').addEventListener('click', () => { activeCameraMode = 'moon'; });
-document.getElementById('btn-shadows').addEventListener('click', () => {
-  shadowsGroup.visible = !shadowsGroup.visible;
-  document.getElementById('btn-shadows').classList.toggle('active', shadowsGroup.visible);
-});
+document.getElementById('btn-shadows').addEventListener('click', () => { shadowsGroup.visible = !shadowsGroup.visible; document.getElementById('btn-shadows').classList.toggle('active', shadowsGroup.visible); });
 
-document.getElementById('btn-live-date').addEventListener('click', () => {
-  document.getElementById('calendar-picker').value = '';
-  isPlaying = true; playBtn.innerText = "Pause"; clearEclipseModes(); updatePhaseInfo();
-});
+document.getElementById('btn-live-date').addEventListener('click', () => { document.getElementById('calendar-picker').value = ''; isPlaying = true; playBtn.innerText = "Pause"; clearEclipseModes(); updatePhaseInfo(); });
 
 const buttonAngles = { "New": 0, "Wax. Crescent": 0.785, "1st Qtr": 1.57, "Wax. Gibbous": 2.356, "Full": 3.141, "Wan. Gibbous": 3.927, "3rd Qtr": 4.712, "Wan. Crescent": 5.498 };
 document.querySelectorAll('.phase-btn').forEach(btn => {
   btn.addEventListener('click', (e) => {
     const btnText = e.target.innerText.trim();
-    if (buttonAngles[btnText] !== undefined) {
-      orbitPivot.rotation.y = 0; orbitalAnomaly = buttonAngles[btnText];
-      isPlaying = false; playBtn.innerText = "Play"; clearEclipseModes(); updatePhaseInfo();
-    }
+    if (buttonAngles[btnText] !== undefined) { orbitPivot.rotation.y = 0; orbitalAnomaly = buttonAngles[btnText]; isPlaying = false; playBtn.innerText = "Play"; clearEclipseModes(); updatePhaseInfo(); }
   });
 });
 
@@ -476,15 +567,7 @@ document.getElementById('calendar-picker').addEventListener('change', (e) => {
 });
 
 document.getElementById('reset-cam-btn').addEventListener('click', () => { activeCameraMode = 'reset'; });
-controls.addEventListener('start', () => { if (activeCameraMode !== 'free' && activeCameraMode !== 'reset') activeCameraMode = 'free'; });
+controls.addEventListener('start', () => { if (activeCameraMode !== 'free' && activeCameraMode !== 'reset' && activeCameraMode !== 'tidal') activeCameraMode = 'free'; });
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight; 
-  updateCameraOffset(); 
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  resizeTelescope(); 
-});
-
-updateCameraOffset();
-resizeTelescope(); 
-animate();
+window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; updateCameraOffset(); renderer.setSize(window.innerWidth, window.innerHeight); resizeTelescope(); });
+updateCameraOffset(); resizeTelescope(); animate();
