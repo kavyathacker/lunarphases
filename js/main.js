@@ -266,7 +266,6 @@ let isPlaying = true;
 let orbitSpeed = 1.0;
 let orbitalAnomaly = 0; 
 
-// FIXED: Variables for Absolute Camera Lock Tracking
 let activeCameraMode = 'free'; 
 let isCamLocked = false; 
 let cameraTransitionTimer = 0; 
@@ -280,7 +279,7 @@ function setCameraMode(mode) {
   if (activeCameraMode !== mode) {
     activeCameraMode = mode;
     isCamLocked = false; 
-    cameraTransitionTimer = 0; // Reset the timeout counter!
+    cameraTransitionTimer = 0; 
   }
 }
 
@@ -333,7 +332,6 @@ function updatePhaseInfo() {
 function updateCameraOffset() {
   const isMobile = window.innerWidth <= 768;
   
-  // Mobile Zoom-Out Override
   camera.fov = isMobile ? 85 : 45; 
   
   if (isMobile) { 
@@ -453,7 +451,9 @@ function animate() {
     targetCamPos.set(0.1, zoomScalar, 0.1); 
     targetCtrlPos.set(0, 0, 0);
   } else if (activeCameraMode === 'earth') {
-    let zoomScalar = window.innerWidth <= 768 ? 10.0 : 7.3;
+    // FIXED: Mathematically locks the camera distance to exactly 7.3 across all devices.
+    // This strictly preserves the apparent size ratios so the Ring of Fire works flawlessly on mobile!
+    let zoomScalar = 7.3;
     let dirToMoon = moonWorldPos.clone().normalize();
     targetCamPos.copy(dirToMoon.multiplyScalar(zoomScalar)); targetCtrlPos.copy(moonWorldPos);
   } else if (activeCameraMode === 'moon') {
@@ -466,7 +466,6 @@ function animate() {
     targetCamPos.set(20, resetY, resetZ); targetCtrlPos.set(20, 0, 0);
   }
 
-  // FIXED: The Foolproof Absolute Lock
   if (activeCameraMode !== 'free') {
     let camDist = camera.position.distanceTo(targetCamPos);
     let ctrlDist = controls.target.distanceTo(targetCtrlPos);
@@ -474,8 +473,6 @@ function animate() {
     if (!isCamLocked) {
       cameraTransitionTimer += delta; 
       
-      // If the camera physically catches the target, OR if exactly 1 second has passed, FORCE the lock.
-      // This mathematically guarantees 0 lag and 0 dragging regardless of orbit speed.
       if ((camDist < 1.0 && ctrlDist < 1.0) || cameraTransitionTimer > 1.0) {
         isCamLocked = true;
       } else {
